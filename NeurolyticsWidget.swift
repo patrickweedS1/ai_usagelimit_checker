@@ -299,75 +299,74 @@ struct NeurolyticsWidgetEntryView : View {
     private func largeWidgetView(_ snapshots: [ProviderSnapshot]) -> some View {
         let prefs = getVisiblePreferences()
         
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(snapshots) { snapshot in
-                    let providerColor = colorForTheme(snapshot.themeColorName)
+        return VStack(alignment: .leading, spacing: 12) {
+            ForEach(snapshots) { snapshot in
+                let providerColor = colorForTheme(snapshot.themeColorName)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    // Header for each provider
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(providerColor)
+                            .frame(width: 8, height: 8)
+                        Text(snapshot.provider.uppercased())
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundColor(providerColor)
+                        Spacer()
+                        Text(snapshot.accountName)
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
                     
-                    VStack(alignment: .leading, spacing: 6) {
-                        // Header for each provider
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(providerColor)
-                                .frame(width: 8, height: 8)
-                            Text(snapshot.provider.uppercased())
-                                .font(.system(size: 11, weight: .black))
-                                .foregroundColor(providerColor)
-                            Spacer()
-                            Text(snapshot.accountName)
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
+                    // Render all groups and visible buckets (no prefix(2) limiting!)
+                    ForEach(snapshot.groups) { group in
+                        let visibleBuckets = group.buckets.filter { isBucketVisible(snapshot.provider, bucketId: $0.bucketId, prefs: prefs) }
                         
-                        // Render all groups and visible buckets (no prefix(2) limiting!)
-                        ForEach(snapshot.groups) { group in
-                            let visibleBuckets = group.buckets.filter { isBucketVisible(snapshot.provider, bucketId: $0.bucketId, prefs: prefs) }
-                            
-                            if !visibleBuckets.isEmpty {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(group.displayName)
-                                        .font(.system(size: 8.5, weight: .bold, design: .rounded))
-                                        .tracking(0.5)
-                                        .foregroundColor(.secondary)
-                                        .padding(.bottom, 2)
-                                    
-                                    VStack(spacing: 10) {
-                                        ForEach(visibleBuckets) { bucket in
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                HStack {
-                                                    Text(bucket.displayName)
-                                                        .font(.system(size: 11, weight: .semibold))
-                                                        .lineLimit(1)
-                                                    Spacer()
-                                                    Text("\(String(format: "%.1f", bucket.usedPercent))%")
-                                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                                }
-                                                
-                                                WidgetProgressBar(usedValue: bucket.usedPercent, color: providerColor)
-                                                
-                                                Text(bucket.resetsDescription)
-                                                    .font(.system(size: 9))
-                                                    .foregroundColor(.secondary)
+                        if !visibleBuckets.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(group.displayName)
+                                    .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                                    .tracking(0.5)
+                                    .foregroundColor(.secondary)
+                                    .padding(.bottom, 2)
+                                
+                                VStack(spacing: 10) {
+                                    ForEach(visibleBuckets) { bucket in
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            HStack {
+                                                Text(bucket.displayName)
+                                                    .font(.system(size: 11, weight: .semibold))
                                                     .lineLimit(1)
+                                                Spacer()
+                                                Text("\(String(format: "%.1f", bucket.usedPercent))%")
+                                                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                                             }
+                                            
+                                            WidgetProgressBar(usedValue: bucket.usedPercent, color: providerColor)
+                                            
+                                            Text(bucket.resetsDescription)
+                                                .font(.system(size: 9))
+                                                .foregroundColor(.secondary)
+                                                .lineLimit(1)
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                    .padding(10)
-                    .background(Color.primary.opacity(0.02))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.primary.opacity(0.04), lineWidth: 1)
-                    )
                 }
+                .padding(10)
+                .background(Color.primary.opacity(0.02))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.primary.opacity(0.04), lineWidth: 1)
+                )
             }
-            .padding(12)
+            Spacer()
         }
+        .padding(12)
     }
     
     // MARK: - Colors Mapping
