@@ -105,20 +105,28 @@ public class QuotaManager: ObservableObject {
     }
     
     public func isProviderEnabled(_ provider: String) -> Bool {
-        return provider == "claude"
+        let enabled = UserDefaults.standard.array(forKey: "EnabledProviders") as? [String] ?? ["claude", "antigravity"]
+        return enabled.contains(provider)
     }
     
     public func setProviderEnabled(_ provider: String, enabled: Bool) {
-        // Only Claude is supported now
+        var list = UserDefaults.standard.array(forKey: "EnabledProviders") as? [String] ?? ["claude", "antigravity"]
+        if enabled && !list.contains(provider) {
+            list.append(provider)
+        } else if !enabled && list.contains(provider) {
+            list.removeAll { $0 == provider }
+        }
+        UserDefaults.standard.set(list, forKey: "EnabledProviders")
+        objectWillChange.send()
     }
     
     public func getManualToken(for provider: String) -> String? {
-        guard provider == "claude" else { return nil }
+        guard provider == "claude" || provider == "antigravity" else { return nil }
         return KeychainHelper.shared.readPassword(service: "Neurolytics-\(provider)", account: "token")
     }
     
     public func setManualToken(for provider: String, token: String) {
-        guard provider == "claude" else { return }
+        guard provider == "claude" || provider == "antigravity" else { return }
         if token.isEmpty {
             KeychainHelper.shared.deletePassword(service: "Neurolytics-\(provider)", account: "token")
         } else {
@@ -136,22 +144,53 @@ public class QuotaManager: ObservableObject {
             self.isRefreshing = true
         }
         
-        let token = getManualToken(for: "claude")
-        ClaudeClient.fetchUsage(manualToken: token) { snapshot in
-            DispatchQueue.main.async {
-                let newSnapshots = [snapshot]
-                self.snapshots = newSnapshots
-                self.isRefreshing = false
-                self.lastRefreshed = Date()
-                
-                // Save to JSON cache
-                self.saveSnapshotsToCache(newSnapshots)
-                
-                // Notify widget to refresh if possible
-                NotificationCenter.default.post(name: Notification.Name("QuotaRefreshed"), object: nil)
-                
-                completion?(newSnapshots)
+        let dispatchGroup = DispatchGroup()
+        var newSnapshots: [ProviderSnapshot] = []
+        let snapshotQueue = DispatchQueue(label: "com.neurolytics.snapshots.sync")
+        
+        // 1. Claude Code
+        if isProviderEnabled("claude") {
+            dispatchGroup.enter()
+            let token = getManualToken(for: "claude")
+            ClaudeClient.fetchUsage(manualToken: token) { snapshot in
+                snapshotQueue.async {
+                    newSnapshots.append(snapshot)
+                    dispatchGroup.leave()
+                }
             }
+        }
+        
+        // 2. Antigravity
+        if isProviderEnabled("antigravity") {
+            dispatchGroup.enter()
+            let token = getManualToken(for: "antigravity")
+            AntigravityClient.fetchUsage(manualToken: token) { snapshot in
+                snapshotQueue.async {
+                    newSnapshots.append(snapshot)
+                    dispatchGroup.leave()
+                }
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            let order = ["claude", "antigravity"]
+            newSnapshots.sort { (a, b) -> Bool in
+                let idxA = order.firstIndex(of: a.provider) ?? 99
+                let idxB = order.firstIndex(of: b.provider) ?? 99
+                return idxA < idxB
+            }
+            
+            self.snapshots = newSnapshots
+            self.isRefreshing = false
+            self.lastRefreshed = Date()
+            
+            // Save to JSON cache
+            self.saveSnapshotsToCache(newSnapshots)
+            
+            // Notify widget to refresh if possible
+            NotificationCenter.default.post(name: Notification.Name("QuotaRefreshed"), object: nil)
+            
+            completion?(newSnapshots)
         }
     }
 }

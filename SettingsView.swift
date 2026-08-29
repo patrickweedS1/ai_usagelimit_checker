@@ -129,6 +129,34 @@ struct SettingsView: View {
                         }
                     }
                 )
+                
+                // Antigravity Card
+                providerRow(
+                    id: "antigravity",
+                    name: "Antigravity",
+                    subtitle: "Google's AI IDE & API usage limits",
+                    icon: "sparkles",
+                    color: .purple,
+                    connectAction: {
+                        isAuthenticating = true
+                        authErrorMessage = ""
+                        OAuthHelper.shared.startGoogleLoginFlow { result in
+                            DispatchQueue.main.async {
+                                self.isAuthenticating = false
+                                switch result {
+                                case .success:
+                                    self.manager.setProviderEnabled("antigravity", enabled: true)
+                                    self.manager.refreshAll()
+                                case .failure(let error):
+                                    self.authErrorMessage = error.localizedDescription
+                                    self.selectedProviderForToken = "antigravity"
+                                    self.tokenInput = ""
+                                    self.showTokenSheet = true
+                                }
+                            }
+                        }
+                    }
+                )
             }
         }
     }
