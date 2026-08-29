@@ -541,7 +541,7 @@ public class ChatGPTClient {
 
 // MARK: - Devin Client
 public class DevinClient {
-    public static func fetchUsage(manualToken: String? = nil, manualOrgId: String? = nil, completion: @escaping (ProviderSnapshot) -> Void) {
+    public static func fetchUsage(manualToken: String? = nil, manualOrgId: String? = nil, customHost: String? = nil, completion: @escaping (ProviderSnapshot) -> Void) {
         let fetchedAt = Date()
         var resolvedToken = manualToken
         var resolvedOrgId = manualOrgId
@@ -576,6 +576,12 @@ public class DevinClient {
             return
         }
         
+        // Resolve custom base host (e.g. sentinelone.devinenterprise.com -> api.sentinelone.devinenterprise.com) (Feedback #3)
+        var baseHost = customHost ?? "api.devin.ai"
+        if baseHost != "api.devin.ai" && !baseHost.hasPrefix("api.") {
+            baseHost = "api." + baseHost
+        }
+        
         // Sum Devin consumption for the current month
         let calendar = Calendar.current
         let now = Date()
@@ -585,7 +591,7 @@ public class DevinClient {
         let startTimestamp = Int(startOfMonth.timeIntervalSince1970)
         let endTimestamp = Int(endOfMonth.timeIntervalSince1970)
         
-        guard let url = URL(string: "https://api.devin.ai/v3/enterprise/consumption/daily?time_after=\(startTimestamp)&time_before=\(endTimestamp)") else { return }
+        guard let url = URL(string: "https://\(baseHost)/v3/enterprise/consumption/daily?time_after=\(startTimestamp)&time_before=\(endTimestamp)") else { return }
         
         let headers = [
             "Authorization": "Bearer \(token)"
@@ -659,7 +665,7 @@ public class DevinClient {
                 let is403 = (error as NSError).code == 403
                 if is403 {
                     // Make fallback call to list sessions to verify status is active/OK
-                    let fallbackUrl = URL(string: "https://api.devin.ai/v3/self")!
+                    let fallbackUrl = URL(string: "https://\(baseHost)/v3/self")!
                     NetworkHelper.performRequest(url: fallbackUrl, headers: headers) { fallbackResult in
                         switch fallbackResult {
                         case .success:

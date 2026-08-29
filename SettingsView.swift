@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var selectedProviderForToken: String = ""
     @State private var tokenInput: String = ""
     @State private var devinOrgInput: String = ""
+    @State private var devinHostInput: String = ""
     @State private var authErrorMessage: String = ""
     @State private var isAuthenticating: Bool = false
     
@@ -191,6 +192,7 @@ struct SettingsView: View {
                         selectedProviderForToken = "devin"
                         tokenInput = manager.getManualToken(for: "devin") ?? ""
                         devinOrgInput = UserDefaults.standard.string(forKey: "DevinOrgId") ?? ""
+                        devinHostInput = manager.devinCustomHost
                         authErrorMessage = "Opened Devin in your browser. Please create or copy your service user API key (starts with cog_) and paste it below."
                         showTokenSheet = true
                     }
@@ -444,6 +446,12 @@ struct SettingsView: View {
                     TextField("your_org_id (starts with org-)", text: $devinOrgInput)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 10))
+                    
+                    Text("Custom Host / Domain (Optional)")
+                        .font(.system(size: 10, weight: .bold))
+                    TextField("api.devin.ai or sentinelone.devinenterprise.com", text: $devinHostInput)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 10))
                 }
             }
             
@@ -466,6 +474,7 @@ struct SettingsView: View {
                     manager.setManualToken(for: selectedProviderForToken, token: tokenInput)
                     if selectedProviderForToken == "devin" {
                         UserDefaults.standard.set(devinOrgInput, forKey: "DevinOrgId")
+                        manager.devinCustomHost = devinHostInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "api.devin.ai" : devinHostInput.trimmingCharacters(in: .whitespacesAndNewlines)
                     }
                     manager.setProviderEnabled(selectedProviderForToken, enabled: true)
                     manager.refreshAll()

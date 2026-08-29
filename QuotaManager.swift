@@ -80,6 +80,14 @@ public class QuotaManager: ObservableObject {
         }
     }
     
+    public var devinCustomHost: String {
+        get { UserDefaults.standard.string(forKey: "DevinCustomHost") ?? "api.devin.ai" }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "DevinCustomHost")
+            objectWillChange.send()
+        }
+    }
+    
     public func isProviderEnabled(_ provider: String) -> Bool {
         let enabled = UserDefaults.standard.array(forKey: "EnabledProviders") as? [String] ?? ["claude", "antigravity", "chatgpt"]
         return enabled.contains(provider)
@@ -163,7 +171,7 @@ public class QuotaManager: ObservableObject {
             dispatchGroup.enter()
             let token = getManualToken(for: "devin")
             let orgId = UserDefaults.standard.string(forKey: "DevinOrgId")
-            DevinClient.fetchUsage(manualToken: token, manualOrgId: orgId) { snapshot in
+            DevinClient.fetchUsage(manualToken: token, manualOrgId: orgId, customHost: devinCustomHost) { snapshot in
                 snapshotQueue.async {
                     newSnapshots.append(snapshot)
                     dispatchGroup.leave()
