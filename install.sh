@@ -121,8 +121,8 @@ mv "${EXTRACTED_APP}" "${INSTALL_PATH}"
 # Ensure correct execution permissions
 chmod -R +rX "${INSTALL_PATH}"
 chmod +x "${INSTALL_PATH}/Contents/MacOS/${APP_NAME}"
-if [ -d "${INSTALL_PATH}/Contents/PlugIns/NeurolyticsWidget.appex" ]; then
-    chmod +x "${INSTALL_PATH}/Contents/PlugIns/NeurolyticsWidget.appex/Contents/MacOS/NeurolyticsWidget"
+if [ -d "${INSTALL_PATH}/Contents/Extensions/NeurolyticsWidget.appex" ]; then
+    chmod +x "${INSTALL_PATH}/Contents/Extensions/NeurolyticsWidget.appex/Contents/MacOS/NeurolyticsWidget"
 fi
 
 # Double check and remove any accidental quarantine flags if they exist

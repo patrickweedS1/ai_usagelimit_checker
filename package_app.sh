@@ -20,12 +20,12 @@ echo "Step 2: Applying ad-hoc code signature..."
 # App Extensions (like WidgetKit) MUST be sandboxed on modern macOS (Sonoma/Sequoia), so we sign them with the sandbox entitlement.
 # We sign from the inside out (first the widget extension, then the main app bundle).
 
-WIDGET_PATH="${APP_PATH}/Contents/PlugIns/NeurolyticsWidget.appex"
-echo "Signing Widget Extension with Sandbox Entitlements..."
-codesign --force --sign - --entitlements NeurolyticsWidget.entitlements "${WIDGET_PATH}"
+WIDGET_PATH="${APP_PATH}/Contents/Extensions/NeurolyticsWidget.appex"
+echo "Signing Widget Extension with Sandbox Entitlements and Hardened Runtime..."
+codesign --force --options runtime --sign - --entitlements NeurolyticsWidget.entitlements "${WIDGET_PATH}"
 
-echo "Signing Main App Bundle..."
-codesign --force --sign - "${APP_PATH}"
+echo "Signing Main App Bundle with Hardened Runtime and App Group Entitlements..."
+codesign --force --options runtime --sign - --entitlements Neurolytics.entitlements "${APP_PATH}"
 
 echo ""
 echo "Step 3: Creating a distribution zip using ditto..."

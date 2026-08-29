@@ -8,8 +8,8 @@ APP_DIR="${OUTPUT_DIR}/${APP_NAME}.app"
 echo "Creating macOS app bundle structure for ${APP_NAME}..."
 mkdir -p "${APP_DIR}/Contents/MacOS"
 mkdir -p "${APP_DIR}/Contents/Resources"
-mkdir -p "${APP_DIR}/Contents/PlugIns/NeurolyticsWidget.appex/Contents/MacOS"
-mkdir -p "${APP_DIR}/Contents/PlugIns/NeurolyticsWidget.appex/Contents/Resources"
+mkdir -p "${APP_DIR}/Contents/Extensions/NeurolyticsWidget.appex/Contents/MacOS"
+mkdir -p "${APP_DIR}/Contents/Extensions/NeurolyticsWidget.appex/Contents/Resources"
 
 # Generate Info.plist for Main App
 echo "Generating Info.plist..."
@@ -42,7 +42,7 @@ EOF
 
 # Generate Info.plist for Widget Extension
 echo "Generating Widget Info.plist..."
-cat << 'EOF' > "${APP_DIR}/Contents/PlugIns/NeurolyticsWidget.appex/Contents/Info.plist"
+cat << 'EOF' > "${APP_DIR}/Contents/Extensions/NeurolyticsWidget.appex/Contents/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -73,9 +73,9 @@ cat << 'EOF' > "${APP_DIR}/Contents/PlugIns/NeurolyticsWidget.appex/Contents/Inf
     <string>6.0</string>
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
-    <key>NSExtension</key>
+    <key>EXAppExtensionAttributes</key>
     <dict>
-        <key>NSExtensionPointIdentifier</key>
+        <key>EXExtensionPointIdentifier</key>
         <string>com.apple.widgetkit-extension</string>
     </dict>
 </dict>
@@ -85,7 +85,7 @@ EOF
 if [ -f "AppIcon.icns" ]; then
     echo "Bundling App Icon..."
     cp "AppIcon.icns" "${APP_DIR}/Contents/Resources/AppIcon.icns"
-    cp "AppIcon.icns" "${APP_DIR}/Contents/PlugIns/NeurolyticsWidget.appex/Contents/Resources/AppIcon.icns"
+    cp "AppIcon.icns" "${APP_DIR}/Contents/Extensions/NeurolyticsWidget.appex/Contents/Resources/AppIcon.icns"
 else
     echo "WARNING: AppIcon.icns not found! Proceeding with generic icon."
 fi
@@ -111,13 +111,15 @@ swiftc -parse-as-library \
     -sdk "$(xcrun --show-sdk-path --sdk macosx)" \
     -target arm64-apple-macos14.0 \
     -module-name NeurolyticsWidget \
-    -o "${APP_DIR}/Contents/PlugIns/NeurolyticsWidget.appex/Contents/MacOS/NeurolyticsWidget" \
+    -Xlinker -e -Xlinker _NSExtensionMain \
+    -Xlinker -u -Xlinker _NSExtensionMain \
+    -o "${APP_DIR}/Contents/Extensions/NeurolyticsWidget.appex/Contents/MacOS/NeurolyticsWidget" \
     NeurolyticsWidget.swift \
     QuotaModels.swift
 
 echo "Making executable..."
 chmod +x "${APP_DIR}/Contents/MacOS/Neurolytics"
-chmod +x "${APP_DIR}/Contents/PlugIns/NeurolyticsWidget.appex/Contents/MacOS/NeurolyticsWidget"
+chmod +x "${APP_DIR}/Contents/Extensions/NeurolyticsWidget.appex/Contents/MacOS/NeurolyticsWidget"
 
 echo "============================================="
 echo "SUCCESS! macOS App successfully created at:"

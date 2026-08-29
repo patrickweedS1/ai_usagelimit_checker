@@ -104,9 +104,9 @@ struct NeurolyticsWidgetEntryView : View {
             if activeSnapshots.isEmpty {
                 VStack(spacing: 8) {
                     Text("🧠 Neurolytics")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 13, weight: .bold))
                     Text("No connected accounts.")
-                        .font(.system(size: 10))
+                        .font(.system(size: 11))
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -129,7 +129,7 @@ struct NeurolyticsWidgetEntryView : View {
             }
         }
         .containerBackground(for: .widget) {
-            Color(NSColor.windowBackgroundColor)
+            Color(NSColor.textBackgroundColor)
         }
     }
     
@@ -138,32 +138,32 @@ struct NeurolyticsWidgetEntryView : View {
     private func smallWidgetView(_ snapshot: ProviderSnapshot) -> some View {
         let providerColor = colorForTheme(snapshot.themeColorName)
         
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
                 Circle()
                     .fill(providerColor)
-                    .frame(width: 5, height: 5)
+                    .frame(width: 6, height: 6)
                 Text(snapshot.provider.uppercased())
-                    .font(.system(size: 9, weight: .black))
+                    .font(.system(size: 11, weight: .black))
                     .foregroundColor(providerColor)
                 Spacer()
             }
             
             if let firstGroup = snapshot.groups.first {
                 ForEach(firstGroup.buckets.prefix(2)) { bucket in
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text(bucket.displayName.replacingOccurrences(of: " Limit Remaining", with: ""))
-                                .font(.system(size: 8, weight: .bold))
+                                .font(.system(size: 11, weight: .bold))
                             Spacer()
                             Text("\(Int(bucket.usedPercent))%")
-                                .font(.system(size: 8, weight: .heavy, design: .monospaced))
+                                .font(.system(size: 11, weight: .heavy, design: .monospaced))
                         }
                         
                         WidgetProgressBar(usedValue: bucket.usedPercent, color: providerColor)
                         
                         Text(bucket.resetsDescription)
-                            .font(.system(size: 7))
+                            .font(.system(size: 9))
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
@@ -184,40 +184,41 @@ struct NeurolyticsWidgetEntryView : View {
             HStack(spacing: 4) {
                 Circle()
                     .fill(providerColor)
-                    .frame(width: 5, height: 5)
+                    .frame(width: 6, height: 6)
                 Text(snapshot.provider.uppercased())
-                    .font(.system(size: 9, weight: .black))
+                    .font(.system(size: 11, weight: .black))
                     .foregroundColor(providerColor)
                 Spacer()
                 Text(snapshot.accountName)
-                    .font(.system(size: 7))
+                    .font(.system(size: 10))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
             
             // Render first group details
             if let group = snapshot.groups.first {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     Text(group.displayName)
-                        .font(.system(size: 9, weight: .black, design: .rounded))
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
                         .tracking(0.5)
                     
-                    VStack(spacing: 8) {
+                    VStack(spacing: 12) {
                         ForEach(group.buckets.prefix(2)) { bucket in
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     Text(bucket.displayName)
-                                        .font(.system(size: 8, weight: .bold))
+                                        .font(.system(size: 12, weight: .semibold))
                                     Spacer()
                                     Text("\(String(format: "%.1f", bucket.usedPercent))%")
-                                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                        .font(.system(size: 12, weight: .bold, design: .monospaced))
                                 }
                                 
                                 WidgetProgressBar(usedValue: bucket.usedPercent, color: providerColor)
                                 
                                 Text(bucket.resetsDescription)
-                                    .font(.system(size: 7.5))
+                                    .font(.system(size: 10))
                                     .foregroundColor(.secondary)
+                                    .lineLimit(1)
                             }
                         }
                     }
@@ -225,13 +226,7 @@ struct NeurolyticsWidgetEntryView : View {
             }
             Spacer()
         }
-        .padding(8)
-        .background(Color.primary.opacity(0.02))
-        .cornerRadius(6)
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.primary.opacity(0.04), lineWidth: 1)
-        )
+        .padding(4)
     }
     
     // MARK: - Colors Mapping
