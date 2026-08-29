@@ -68,7 +68,7 @@ public class OAuthHelper {
             }
             
             // Exchange code for Access/Refresh Tokens
-            self.exchangeCodeForTokens(code: code, verifier: verifier, completion: completion)
+            self.exchangeCodeForTokens(code: code, verifier: verifier, state: returnedState, completion: completion)
         }
         
         callbackServer?.start()
@@ -95,7 +95,7 @@ public class OAuthHelper {
         }
     }
     
-    private func exchangeCodeForTokens(code: String, verifier: String, completion: @escaping (Result<String, Error>) -> Void) {
+    private func exchangeCodeForTokens(code: String, verifier: String, state: String, completion: @escaping (Result<String, Error>) -> Void) {
         guard let tokenUrl = URL(string: "https://platform.claude.com/v1/oauth/token") else { return }
         
         let bodyJson: [String: String] = [
@@ -103,6 +103,7 @@ public class OAuthHelper {
             "client_id": clientId,
             "code": code,
             "code_verifier": verifier,
+            "state": state,
             "redirect_uri": "http://localhost:\(port)/callback"
         ]
         
@@ -193,16 +194,17 @@ public class OAuthHelper {
     private func exchangeGoogleCodeForTokens(code: String, verifier: String, completion: @escaping (Result<String, Error>) -> Void) {
         guard let tokenUrl = URL(string: "https://oauth2.googleapis.com/token") else { return }
         
-        let bodyComponents = [
-            "grant_type=authorization_code",
-            "client_id=32555940559.apps.googleusercontent.com",
-            "code=\(code)",
-            "code_verifier=\(verifier)",
-            "redirect_uri=http://localhost:\(port)/callback"
+        var bodyComponents = URLComponents()
+        bodyComponents.queryItems = [
+            URLQueryItem(name: "grant_type", value: "authorization_code"),
+            URLQueryItem(name: "client_id", value: "32555940559.apps.googleusercontent.com"),
+            URLQueryItem(name: "code", value: code),
+            URLQueryItem(name: "code_verifier", value: verifier),
+            URLQueryItem(name: "redirect_uri", value: "http://localhost:\(port)/callback")
         ]
         
-        let bodyString = bodyComponents.joined(separator: "&")
-        guard let bodyData = bodyString.data(using: .utf8) else { return }
+        guard let bodyString = bodyComponents.percentEncodedQuery,
+              let bodyData = bodyString.data(using: .utf8) else { return }
         
         var request = URLRequest(url: tokenUrl)
         request.httpMethod = "POST"
@@ -215,9 +217,20 @@ public class OAuthHelper {
                 return
             }
             
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
-                  let data = data else {
-                completion(.failure(NSError(domain: "OAuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Google token exchange failed."])))
+            guard let httpResponse = response as? HTTPURLResponse else {
+                completion(.failure(NSError(domain: "OAuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid Google server response"])))
+                return
+            }
+            
+            if !(200...299).contains(httpResponse.statusCode) {
+                let errorBody = data != nil ? String(data: data!, encoding: .utf8) : ""
+                let errorMsg = "Google exchange failed (status \(httpResponse.statusCode)): \(errorBody ?? "")"
+                completion(.failure(NSError(domain: "OAuthError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg])))
+                return
+            }
+            
+            guard let data = data else {
+                completion(.failure(NSError(domain: "OAuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Empty Google response"])))
                 return
             }
             
