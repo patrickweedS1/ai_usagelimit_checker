@@ -51,10 +51,12 @@ struct SettingsView: View {
                         .foregroundColor(activeTab == tab ? .blue : .primary.opacity(0.7))
                         .padding(.vertical, 8)
                         .padding(.horizontal, 16)
+                        .contentShape(Rectangle()) // Make the entire padded box area clickable (Feedback #1)
                         .background(activeTab == tab ? Color.blue.opacity(0.08) : Color.clear)
                         .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
+                    .focusable(false) // Disable keyboard focus highlight boxes (Feedback #2)
                 }
             }
             .padding(.horizontal)
@@ -136,10 +138,23 @@ struct SettingsView: View {
                     icon: "sparkles",
                     color: .purple,
                     connectAction: {
-                        selectedProviderForToken = "antigravity"
-                        tokenInput = manager.getManualToken(for: "antigravity") ?? ""
+                        isAuthenticating = true
                         authErrorMessage = ""
-                        showTokenSheet = true
+                        OAuthHelper.shared.startGoogleLoginFlow { result in
+                            DispatchQueue.main.async {
+                                self.isAuthenticating = false
+                                switch result {
+                                case .success:
+                                    self.manager.setProviderEnabled("antigravity", enabled: true)
+                                    self.manager.refreshAll()
+                                case .failure(let error):
+                                    self.authErrorMessage = error.localizedDescription
+                                    self.selectedProviderForToken = "antigravity"
+                                    self.tokenInput = ""
+                                    self.showTokenSheet = true
+                                }
+                            }
+                        }
                     }
                 )
                 
@@ -151,9 +166,13 @@ struct SettingsView: View {
                     icon: "text.bubble",
                     color: .teal,
                     connectAction: {
+                        // Open ChatGPT natively in the user's browser (Feedback #5)
+                        if let url = URL(string: "https://chatgpt.com") {
+                            NSWorkspace.shared.open(url)
+                        }
                         selectedProviderForToken = "chatgpt"
                         tokenInput = manager.getManualToken(for: "chatgpt") ?? ""
-                        authErrorMessage = ""
+                        authErrorMessage = "Opened ChatGPT in your default browser. Please log in, copy your session token, and paste it below."
                         showTokenSheet = true
                     }
                 )
@@ -166,10 +185,14 @@ struct SettingsView: View {
                     icon: "square.grid.3x1.below.line.grid.1x2",
                     color: .indigo,
                     connectAction: {
+                        // Open Devin settings natively in the user's browser (Feedback #5)
+                        if let url = URL(string: "https://devin.ai/settings") {
+                            NSWorkspace.shared.open(url)
+                        }
                         selectedProviderForToken = "devin"
                         tokenInput = manager.getManualToken(for: "devin") ?? ""
                         devinOrgInput = UserDefaults.standard.string(forKey: "DevinOrgId") ?? ""
-                        authErrorMessage = ""
+                        authErrorMessage = "Opened Devin Settings in your browser. Generate or copy your API Key and paste it below."
                         showTokenSheet = true
                     }
                 )

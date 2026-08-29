@@ -36,6 +36,7 @@ struct ContentView: View {
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .focusable(false) // Disable focus highlight box (Feedback #2)
                 }
             }
             .padding(.horizontal, 16)
@@ -83,30 +84,33 @@ struct ContentView: View {
                 
                 Button(action: openSettings) {
                     HStack(spacing: 4) {
-                        Image(systemName: "slider.horizontal.3")
+                        Image(systemName: "gearshape")
                         Text("Settings")
                     }
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.secondary)
                     .padding(.vertical, 4)
                     .padding(.horizontal, 8)
-                    .background(Color.primary.opacity(0.06))
+                    .background(Color.primary.opacity(0.05))
                     .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
+                .focusable(false) // Disable focus highlight box (Feedback #2)
                 
                 Button(action: quitApp) {
                     HStack(spacing: 4) {
                         Image(systemName: "power")
                         Text("Quit")
                     }
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.secondary)
                     .padding(.vertical, 4)
                     .padding(.horizontal, 8)
-                    .background(Color.red.opacity(0.08))
-                    .foregroundColor(.red)
+                    .background(Color.primary.opacity(0.05))
                     .cornerRadius(4)
                 }
                 .buttonStyle(.plain)
+                .focusable(false) // Disable focus highlight box (Feedback #2)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -236,6 +240,7 @@ struct ContentView: View {
                     .cornerRadius(4)
             }
             .buttonStyle(.plain)
+            .focusable(false)
         }
         .padding(12)
         .background(Color(NSColor.alternatingContentBackgroundColors[0]))
@@ -275,6 +280,7 @@ struct ContentView: View {
                     .cornerRadius(6)
             }
             .buttonStyle(.plain)
+            .focusable(false)
             .padding(.bottom, 40)
         }
     }
