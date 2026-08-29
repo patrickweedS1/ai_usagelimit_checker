@@ -11,7 +11,7 @@ set -e
 # ==========================================
 # CONFIGURATION
 # Set this to the URL where you host Neurolytics.zip (e.g., GitHub Release asset)
-DEFAULT_DOWNLOAD_URL="https://github.com/YOUR_GITHUB_USERNAME/ai_usagelimit_checker/releases/latest/download/Neurolytics.zip"
+DEFAULT_DOWNLOAD_URL="https://github.com/patrickweedS1/ai_usagelimit_checker/releases/latest/download/Neurolytics.zip"
 # ==========================================
 
 DOWNLOAD_URL="${NEUROLYTICS_ZIP_URL:-$DEFAULT_DOWNLOAD_URL}"

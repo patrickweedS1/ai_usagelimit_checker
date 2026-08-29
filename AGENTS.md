@@ -101,11 +101,11 @@ Because macOS's browser/download layer does not attach the `com.apple.quarantine
 4. **Share the Installation Command:**
    Provide others with a single command to run in their Terminal:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/ai_usagelimit_checker/main/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/patrickweedS1/ai_usagelimit_checker/main/install.sh | bash
    ```
    *(Alternatively, users can override the zip URL dynamically without modifying the script):*
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/YOUR_GITHUB_USERNAME/ai_usagelimit_checker/main/install.sh | NEUROLYTICS_ZIP_URL="https://example.com/Neurolytics.zip" bash
+   curl -fsSL https://raw.githubusercontent.com/patrickweedS1/ai_usagelimit_checker/main/install.sh | NEUROLYTICS_ZIP_URL="https://example.com/Neurolytics.zip" bash
    ```
 
 Upon completion, the app is moved directly to their `/Applications` (or user-specific `~/Applications` as fallback) folder and can be launched directly via double-click or Spotlight without any security warnings!
