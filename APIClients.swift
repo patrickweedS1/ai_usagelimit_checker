@@ -886,10 +886,10 @@ public class DevinClient {
                                     description: "Credentials Verified & Connected Natively",
                                     buckets: [QuotaBucket(
                                         bucketId: "devin-status",
-                                        displayName: "Windsurf Session Integration",
+                                        displayName: "Active Connection Status",
                                         windowType: "other",
-                                        usedPercent: 0,
-                                        remainingPercent: 100.0,
+                                        usedPercent: 100.0,
+                                        remainingPercent: 0.0,
                                         resetsAt: nil,
                                         resetsDescription: "Verified & Connected"
                                     )]
