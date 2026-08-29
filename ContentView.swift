@@ -176,18 +176,18 @@ struct ContentView: View {
                                 // Beautiful rounded pill progress bar
                                 HStack(spacing: 10) {
                                     CustomProgressBar(
-                                        remainingValue: bucket.remainingPercent,
+                                        usedValue: bucket.usedPercent,
                                         warningThreshold: manager.warningThreshold,
                                         color: providerColor
                                     )
                                     
-                                    Text("\(String(format: "%.2f", bucket.remainingPercent))%")
+                                    Text("\(String(format: "%.2f", bucket.usedPercent))%")
                                         .font(.system(size: 10, weight: .heavy, design: .monospaced))
                                         .frame(width: 54, alignment: .trailing)
                                 }
                                 
                                 // Metadata resetting description
-                                Text(bucket.resetsAt?.relativeResetTimeDescription() ?? bucket.resetsDescription)
+                                Text("\(String(format: "%.0f", bucket.usedPercent))% used · \(bucket.resetsAt?.relativeResetTimeDescription() ?? bucket.resetsDescription)")
                                     .font(.system(size: 9))
                                     .foregroundColor(.secondary)
                             }
@@ -320,14 +320,14 @@ struct ContentView: View {
 // MARK: - Custom Progress Bar
 
 struct CustomProgressBar: View {
-    let remainingValue: Double // 0.0 - 100.0 (Remaining %)
+    let usedValue: Double // 0.0 - 100.0 (Used %)
     let warningThreshold: Double
     let color: Color
     
     var body: some View {
         GeometryReader { geo in
-            let isUnderThreshold = remainingValue < (100.0 - warningThreshold)
-            let fillColor = isUnderThreshold ? Color.red : color
+            let isOverThreshold = usedValue >= warningThreshold
+            let fillColor = isOverThreshold ? Color.red : color
             
             ZStack(alignment: .leading) {
                 // Background Track
@@ -342,7 +342,7 @@ struct CustomProgressBar: View {
                         startPoint: .leading,
                         endPoint: .trailing
                     ))
-                    .frame(width: CGFloat(remainingValue / 100.0) * geo.size.width, height: 12)
+                    .frame(width: CGFloat(usedValue / 100.0) * geo.size.width, height: 12)
                     .shadow(color: fillColor.opacity(0.15), radius: 1, x: 0, y: 1)
             }
         }

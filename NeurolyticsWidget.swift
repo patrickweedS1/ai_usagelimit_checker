@@ -156,11 +156,11 @@ struct NeurolyticsWidgetEntryView : View {
                             Text(bucket.displayName.replacingOccurrences(of: " Limit Remaining", with: ""))
                                 .font(.system(size: 8, weight: .bold))
                             Spacer()
-                            Text("\(Int(bucket.remainingPercent))%")
+                            Text("\(Int(bucket.usedPercent))%")
                                 .font(.system(size: 8, weight: .heavy, design: .monospaced))
                         }
                         
-                        WidgetProgressBar(remainingValue: bucket.remainingPercent, color: providerColor)
+                        WidgetProgressBar(usedValue: bucket.usedPercent, color: providerColor)
                         
                         Text(bucket.resetsDescription)
                             .font(.system(size: 7))
@@ -209,11 +209,11 @@ struct NeurolyticsWidgetEntryView : View {
                                     Text(bucket.displayName)
                                         .font(.system(size: 8, weight: .bold))
                                     Spacer()
-                                    Text("\(String(format: "%.1f", bucket.remainingPercent))%")
+                                    Text("\(String(format: "%.1f", bucket.usedPercent))%")
                                         .font(.system(size: 8, weight: .bold, design: .monospaced))
                                 }
                                 
-                                WidgetProgressBar(remainingValue: bucket.remainingPercent, color: providerColor)
+                                WidgetProgressBar(usedValue: bucket.usedPercent, color: providerColor)
                                 
                                 Text(bucket.resetsDescription)
                                     .font(.system(size: 7.5))
@@ -250,7 +250,7 @@ struct NeurolyticsWidgetEntryView : View {
 // MARK: - Widget Progress Bar Helper
 
 struct WidgetProgressBar: View {
-    let remainingValue: Double
+    let usedValue: Double
     let color: Color
     
     var body: some View {
@@ -262,7 +262,7 @@ struct WidgetProgressBar: View {
                 
                 RoundedRectangle(cornerRadius: 3)
                     .fill(color)
-                    .frame(width: CGFloat(remainingValue / 100.0) * geo.size.width, height: 6)
+                    .frame(width: CGFloat(usedValue / 100.0) * geo.size.width, height: 6)
             }
         }
         .frame(height: 6)
