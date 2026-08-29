@@ -117,14 +117,21 @@ struct NeurolyticsWidgetEntryView : View {
                     if let first = activeSnapshots.first {
                         smallWidgetView(first)
                     }
-                default: // Medium and large
+                case .systemMedium:
                     // Show up to 2 active providers side-by-side
                     HStack(alignment: .top, spacing: 16) {
                         ForEach(activeSnapshots.prefix(2)) { snapshot in
                             mediumWidgetCard(snapshot)
                         }
                     }
-                    .padding(12)
+                    .padding(10)
+                case .systemLarge, .systemExtraLarge:
+                    // Show full scrollable details for all connected accounts
+                    largeWidgetView(activeSnapshots)
+                @unknown default:
+                    if let first = activeSnapshots.first {
+                        smallWidgetView(first)
+                    }
                 }
             }
         }
@@ -133,37 +140,86 @@ struct NeurolyticsWidgetEntryView : View {
         }
     }
     
+    // MARK: - Preference Loader Helper for Widget
+    
+    private func getVisiblePreferences() -> [String: Bool] {
+        let homeDir = NSHomeDirectory()
+        let prefsURL = URL(fileURLWithPath: homeDir).appendingPathComponent(".config/neurolytics/preferences.json")
+        guard let data = try? Data(contentsOf: prefsURL),
+              let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) else {
+            return [
+                "claude-5h": true,
+                "claude-weekly": true,
+                "claude-extra": true,
+                "antigravity-5h": true,
+                "antigravity-weekly": true
+            ]
+        }
+        return decoded
+    }
+    
+    private func isBucketVisible(_ provider: String, bucketId: String, prefs: [String: Bool]) -> Bool {
+        let type: String
+        let bId = bucketId.lowercased()
+        if provider == "claude" {
+            if bId.contains("session") || bId.contains("5h") {
+                type = "5h"
+            } else if bId.contains("weekly") {
+                type = "weekly"
+            } else if bId.contains("extra") {
+                type = "extra"
+            } else {
+                return true
+            }
+        } else if provider == "antigravity" {
+            if bId.contains("five_hour") || bId.contains("session") || bId.contains("5h") || bId.contains("five-hour") {
+                type = "5h"
+            } else if bId.contains("weekly") {
+                type = "weekly"
+            } else {
+                return true
+            }
+        } else {
+            return true
+        }
+        return prefs["\(provider)-\(type)"] ?? true
+    }
+    
     // MARK: - Small Widget (1 Active Provider)
     
     private func smallWidgetView(_ snapshot: ProviderSnapshot) -> some View {
         let providerColor = colorForTheme(snapshot.themeColorName)
+        let prefs = getVisiblePreferences()
         
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 4) {
                 Circle()
                     .fill(providerColor)
                     .frame(width: 6, height: 6)
                 Text(snapshot.provider.uppercased())
-                    .font(.system(size: 11, weight: .black))
+                    .font(.system(size: 10, weight: .black))
                     .foregroundColor(providerColor)
                 Spacer()
             }
             
             if let firstGroup = snapshot.groups.first {
-                ForEach(firstGroup.buckets.prefix(2)) { bucket in
-                    VStack(alignment: .leading, spacing: 3) {
+                let visibleBuckets = firstGroup.buckets.filter { isBucketVisible(snapshot.provider, bucketId: $0.bucketId, prefs: prefs) }
+                
+                ForEach(visibleBuckets.prefix(2)) { bucket in
+                    VStack(alignment: .leading, spacing: 2) {
                         HStack {
-                            Text(bucket.displayName.replacingOccurrences(of: " Limit Remaining", with: ""))
-                                .font(.system(size: 11, weight: .bold))
+                            Text(bucket.displayName.replacingOccurrences(of: " Limit Remaining", with: "").replacingOccurrences(of: " Spending", with: ""))
+                                .font(.system(size: 9, weight: .bold))
+                                .lineLimit(1)
                             Spacer()
                             Text("\(Int(bucket.usedPercent))%")
-                                .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                                .font(.system(size: 9, weight: .heavy, design: .monospaced))
                         }
                         
                         WidgetProgressBar(usedValue: bucket.usedPercent, color: providerColor)
                         
                         Text(bucket.resetsDescription)
-                            .font(.system(size: 9))
+                            .font(.system(size: 8))
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
@@ -178,47 +234,54 @@ struct NeurolyticsWidgetEntryView : View {
     
     private func mediumWidgetCard(_ snapshot: ProviderSnapshot) -> some View {
         let providerColor = colorForTheme(snapshot.themeColorName)
+        let prefs = getVisiblePreferences()
         
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 4) {
             // Header
             HStack(spacing: 4) {
                 Circle()
                     .fill(providerColor)
                     .frame(width: 6, height: 6)
                 Text(snapshot.provider.uppercased())
-                    .font(.system(size: 11, weight: .black))
+                    .font(.system(size: 10, weight: .black))
                     .foregroundColor(providerColor)
                 Spacer()
                 Text(snapshot.accountName)
-                    .font(.system(size: 10))
+                    .font(.system(size: 8))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
             
             // Render first group details
             if let group = snapshot.groups.first {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(group.displayName)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .tracking(0.5)
-                    
-                    VStack(spacing: 12) {
-                        ForEach(group.buckets.prefix(2)) { bucket in
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(bucket.displayName)
-                                        .font(.system(size: 12, weight: .semibold))
-                                    Spacer()
-                                    Text("\(String(format: "%.1f", bucket.usedPercent))%")
-                                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                let visibleBuckets = group.buckets.filter { isBucketVisible(snapshot.provider, bucketId: $0.bucketId, prefs: prefs) }
+                
+                if !visibleBuckets.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(group.displayName)
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .tracking(0.5)
+                            .foregroundColor(.secondary)
+                        
+                        VStack(spacing: 6) {
+                            ForEach(visibleBuckets.prefix(2)) { bucket in
+                                VStack(alignment: .leading, spacing: 1) {
+                                    HStack {
+                                        Text(bucket.displayName.replacingOccurrences(of: " Limit Remaining", with: "").replacingOccurrences(of: " Spending", with: ""))
+                                            .font(.system(size: 10, weight: .bold))
+                                            .lineLimit(1)
+                                        Spacer()
+                                        Text("\(String(format: "%.1f", bucket.usedPercent))%")
+                                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    }
+                                    
+                                    WidgetProgressBar(usedValue: bucket.usedPercent, color: providerColor)
+                                    
+                                    Text(bucket.resetsDescription)
+                                        .font(.system(size: 8.5))
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
                                 }
-                                
-                                WidgetProgressBar(usedValue: bucket.usedPercent, color: providerColor)
-                                
-                                Text(bucket.resetsDescription)
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
                             }
                         }
                     }
@@ -227,6 +290,82 @@ struct NeurolyticsWidgetEntryView : View {
             Spacer()
         }
         .padding(4)
+    }
+    
+    // MARK: - Large Widget View (All Providers, All Visible Buckets)
+    
+    private func largeWidgetView(_ snapshots: [ProviderSnapshot]) -> some View {
+        let prefs = getVisiblePreferences()
+        
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(snapshots) { snapshot in
+                    let providerColor = colorForTheme(snapshot.themeColorName)
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        // Header for each provider
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(providerColor)
+                                .frame(width: 8, height: 8)
+                            Text(snapshot.provider.uppercased())
+                                .font(.system(size: 11, weight: .black))
+                                .foregroundColor(providerColor)
+                            Spacer()
+                            Text(snapshot.accountName)
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                        
+                        // Render all groups and visible buckets (no prefix(2) limiting!)
+                        ForEach(snapshot.groups) { group in
+                            let visibleBuckets = group.buckets.filter { isBucketVisible(snapshot.provider, bucketId: $0.bucketId, prefs: prefs) }
+                            
+                            if !visibleBuckets.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(group.displayName)
+                                        .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                                        .tracking(0.5)
+                                        .foregroundColor(.secondary)
+                                        .padding(.bottom, 2)
+                                    
+                                    VStack(spacing: 10) {
+                                        ForEach(visibleBuckets) { bucket in
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                HStack {
+                                                    Text(bucket.displayName)
+                                                        .font(.system(size: 11, weight: .semibold))
+                                                        .lineLimit(1)
+                                                    Spacer()
+                                                    Text("\(String(format: "%.1f", bucket.usedPercent))%")
+                                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                                }
+                                                
+                                                WidgetProgressBar(usedValue: bucket.usedPercent, color: providerColor)
+                                                
+                                                Text(bucket.resetsDescription)
+                                                    .font(.system(size: 9))
+                                                    .foregroundColor(.secondary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(10)
+                    .background(Color.primary.opacity(0.02))
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.primary.opacity(0.04), lineWidth: 1)
+                    )
+                }
+            }
+            .padding(12)
+        }
     }
     
     // MARK: - Colors Mapping
@@ -276,6 +415,6 @@ struct NeurolyticsWidget: Widget {
         }
         .configurationDisplayName("Neurolytics Quotas")
         .description("Natively monitors and displays your rolling AI development usage quotas.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

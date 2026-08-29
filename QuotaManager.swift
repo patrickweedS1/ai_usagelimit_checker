@@ -18,16 +18,20 @@ public class QuotaManager: ObservableObject {
     
     private let cacheURL: URL
     private let configFolder: URL
+    private let preferencesURL: URL
+    
+    @Published var visiblePreferences: [String: Bool] = [:]
     
     private init() {
         let homeDir = NSHomeDirectory()
         self.configFolder = URL(fileURLWithPath: homeDir).appendingPathComponent(".config/neurolytics")
         self.cacheURL = configFolder.appendingPathComponent("cache.json")
+        self.preferencesURL = configFolder.appendingPathComponent("preferences.json")
         
         // Ensure directory exists
         try? FileManager.default.createDirectory(at: configFolder, withIntermediateDirectories: true, attributes: nil)
         
-        // Proactively mirror cache to widget sandbox container on initialization
+        // Proactively mirror cache and preferences to widget sandbox container on initialization
         let widgetConfigFolder = URL(fileURLWithPath: homeDir)
             .appendingPathComponent("Library/Containers/com.patrickweed.neurolytics.widget/Data/.config/neurolytics")
         try? FileManager.default.createDirectory(at: widgetConfigFolder, withIntermediateDirectories: true, attributes: nil)
@@ -37,8 +41,14 @@ public class QuotaManager: ObservableObject {
             try? FileManager.default.copyItem(at: cacheURL, to: widgetCacheURL)
         }
         
+        let widgetPrefsURL = widgetConfigFolder.appendingPathComponent("preferences.json")
+        if FileManager.default.fileExists(atPath: preferencesURL.path) && !FileManager.default.fileExists(atPath: widgetPrefsURL.path) {
+            try? FileManager.default.copyItem(at: preferencesURL, to: widgetPrefsURL)
+        }
+        
         // Load cached snapshots on startup
         loadCachedSnapshots()
+        loadPreferences()
     }
     
     // MARK: - Local Cache Management
@@ -75,6 +85,83 @@ public class QuotaManager: ObservableObject {
         
         // 3. Trigger a reload of all Widget timelines
         WidgetCenter.shared.reloadAllTimelines()
+    }
+    
+    public func loadPreferences() {
+        if let data = try? Data(contentsOf: preferencesURL),
+           let decoded = try? JSONDecoder().decode([String: Bool].self, from: data) {
+            DispatchQueue.main.async {
+                self.visiblePreferences = decoded
+            }
+        } else {
+            let defaults = [
+                "claude-5h": true,
+                "claude-weekly": true,
+                "claude-extra": true,
+                "antigravity-5h": true,
+                "antigravity-weekly": true
+            ]
+            self.visiblePreferences = defaults
+            savePreferences(defaults)
+        }
+    }
+    
+    public func savePreferences(_ prefs: [String: Bool]) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        if let data = try? encoder.encode(prefs) {
+            try? data.write(to: preferencesURL)
+            
+            let homeDir = NSHomeDirectory()
+            let widgetConfigFolder = URL(fileURLWithPath: homeDir)
+                .appendingPathComponent("Library/Containers/com.patrickweed.neurolytics.widget/Data/.config/neurolytics")
+            try? FileManager.default.createDirectory(at: widgetConfigFolder, withIntermediateDirectories: true, attributes: nil)
+            let widgetPrefsURL = widgetConfigFolder.appendingPathComponent("preferences.json")
+            try? data.write(to: widgetPrefsURL)
+        }
+        
+        DispatchQueue.main.async {
+            self.visiblePreferences = prefs
+            self.objectWillChange.send()
+        }
+        
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+    
+    public func isBucketTypeVisible(provider: String, type: String) -> Bool {
+        return visiblePreferences["\(provider)-\(type)"] ?? true
+    }
+    
+    public func setBucketTypeVisible(provider: String, type: String, visible: Bool) {
+        var prefs = visiblePreferences
+        prefs["\(provider)-\(type)"] = visible
+        savePreferences(prefs)
+    }
+    
+    public func getBucketType(provider: String, bucketId: String) -> String {
+        let bId = bucketId.lowercased()
+        if provider == "claude" {
+            if bId.contains("session") || bId.contains("5h") {
+                return "5h"
+            } else if bId.contains("weekly") {
+                return "weekly"
+            } else if bId.contains("extra") {
+                return "extra"
+            }
+        } else if provider == "antigravity" {
+            if bId.contains("five_hour") || bId.contains("session") || bId.contains("5h") || bId.contains("five-hour") {
+                return "5h"
+            } else if bId.contains("weekly") {
+                return "weekly"
+            }
+        }
+        return "other"
+    }
+    
+    public func isBucketVisible(provider: String, bucketId: String) -> Bool {
+        let type = getBucketType(provider: provider, bucketId: bucketId)
+        if type == "other" { return true }
+        return visiblePreferences["\(provider)-\(type)"] ?? true
     }
     
     // MARK: - Preferences & Settings Accessors

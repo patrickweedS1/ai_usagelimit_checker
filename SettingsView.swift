@@ -103,7 +103,7 @@ struct SettingsView: View {
             
             VStack(spacing: 12) {
                 // Claude Card
-                providerRow(
+                providerCard(
                     id: "claude",
                     name: "Claude Code",
                     subtitle: "Anthropic's CLI & API usage limits",
@@ -128,10 +128,50 @@ struct SettingsView: View {
                             }
                         }
                     }
-                )
+                ) {
+                    let isClaudeConnected = manager.snapshots.first(where: { $0.provider == "claude" })?.status == "ok"
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Divider()
+                            .padding(.horizontal, 10)
+                            .padding(.bottom, 6)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("LIMIT OPTIONS TO DISPLAY:")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(.secondary)
+                                .tracking(0.5)
+                            
+                            HStack(spacing: 12) {
+                                Toggle("5-Hour Limit", isOn: Binding(
+                                    get: { self.manager.isBucketTypeVisible(provider: "claude", type: "5h") },
+                                    set: { self.manager.setBucketTypeVisible(provider: "claude", type: "5h", visible: $0) }
+                                ))
+                                .disabled(!isClaudeConnected)
+                                
+                                Toggle("Weekly Limit", isOn: Binding(
+                                    get: { self.manager.isBucketTypeVisible(provider: "claude", type: "weekly") },
+                                    set: { self.manager.setBucketTypeVisible(provider: "claude", type: "weekly", visible: $0) }
+                                ))
+                                .disabled(!isClaudeConnected)
+                                
+                                Toggle("Overage Credits", isOn: Binding(
+                                    get: { self.manager.isBucketTypeVisible(provider: "claude", type: "extra") },
+                                    set: { self.manager.setBucketTypeVisible(provider: "claude", type: "extra", visible: $0) }
+                                ))
+                                .disabled(!isClaudeConnected)
+                            }
+                            .toggleStyle(.checkbox)
+                            .font(.system(size: 9.5))
+                            .foregroundColor(isClaudeConnected ? .primary : .secondary.opacity(0.4))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                    }
+                }
                 
                 // Antigravity Card
-                providerRow(
+                providerCard(
                     id: "antigravity",
                     name: "Antigravity",
                     subtitle: "Google's AI IDE & API usage limits",
@@ -156,83 +196,122 @@ struct SettingsView: View {
                             }
                         }
                     }
-                )
+                ) {
+                    let isAntigravityConnected = manager.snapshots.first(where: { $0.provider == "antigravity" })?.status == "ok"
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Divider()
+                            .padding(.horizontal, 10)
+                            .padding(.bottom, 6)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("LIMIT OPTIONS TO DISPLAY:")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(.secondary)
+                                .tracking(0.5)
+                            
+                            HStack(spacing: 12) {
+                                Toggle("5-Hour Limit", isOn: Binding(
+                                    get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "5h") },
+                                    set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "5h", visible: $0) }
+                                ))
+                                .disabled(!isAntigravityConnected)
+                                
+                                Toggle("Weekly Limit", isOn: Binding(
+                                    get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "weekly") },
+                                    set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "weekly", visible: $0) }
+                                ))
+                                .disabled(!isAntigravityConnected)
+                            }
+                            .toggleStyle(.checkbox)
+                            .font(.system(size: 9.5))
+                            .foregroundColor(isAntigravityConnected ? .primary : .secondary.opacity(0.4))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                    }
+                }
             }
         }
     }
     
-    private func providerRow(
+    private func providerCard<Content: View>(
         id: String,
         name: String,
         subtitle: String,
         icon: String,
         color: Color,
-        connectAction: @escaping () -> Void
+        connectAction: @escaping () -> Void,
+        @ViewBuilder extraContent: @escaping () -> Content
     ) -> some View {
         let isEnabled = manager.isProviderEnabled(id)
         let isConnected = manager.snapshots.first(where: { $0.provider == id })?.status == "ok"
         
-        return HStack(spacing: 12) {
-            // Icon
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(color.opacity(0.1))
-                    .frame(width: 36, height: 36)
-                
-                Image(systemName: icon)
-                    .font(.system(size: 18))
-                    .foregroundColor(color)
-            }
-            
-            // Text Details
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(name)
-                        .font(.system(size: 12, weight: .bold))
+        return VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                // Icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(color.opacity(0.1))
+                        .frame(width: 36, height: 36)
                     
-                    if isConnected && isEnabled {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.system(size: 10))
-                    }
+                    Image(systemName: icon)
+                        .font(.system(size: 18))
+                        .foregroundColor(color)
                 }
                 
-                Text(subtitle)
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            // Connect Button styled with TapGesture to resolve SwiftUI row-clamping & focus ring bugs (Feedback #2 & #5)
-            Text(isConnected ? "Connected" : "Connect")
-                .font(.system(size: 10, weight: .semibold))
-                .padding(.vertical, 4)
-                .padding(.horizontal, 10)
-                .background(isConnected ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
-                .foregroundColor(isConnected ? .green : .blue)
-                .cornerRadius(4)
-                .contentShape(Rectangle()) // Make the entire capsule area clickable
-                .onTapGesture {
-                    if !isAuthenticating {
-                        connectAction()
+                // Text Details
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(name)
+                            .font(.system(size: 12, weight: .bold))
+                        
+                        if isConnected && isEnabled {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.system(size: 10))
+                        }
                     }
+                    
+                    Text(subtitle)
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
                 }
+                
+                Spacer()
+                
+                // Connect Button styled with TapGesture to resolve SwiftUI row-clamping & focus ring bugs (Feedback #2 & #5)
+                Text(isConnected ? "Connected" : "Connect")
+                    .font(.system(size: 10, weight: .semibold))
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 10)
+                    .background(isConnected ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
+                    .foregroundColor(isConnected ? .green : .blue)
+                    .cornerRadius(4)
+                    .contentShape(Rectangle()) // Make the entire capsule area clickable
+                    .onTapGesture {
+                        if !isAuthenticating {
+                            connectAction()
+                        }
+                    }
+                
+                // Toggle Switch
+                Toggle("", isOn: Binding(
+                    get: { self.manager.isProviderEnabled(id) },
+                    set: { 
+                        self.manager.setProviderEnabled(id, enabled: $0)
+                        self.manager.refreshAll()
+                    }
+                ))
+                .toggleStyle(.switch)
+                .scaleEffect(0.7)
+                .frame(width: 40)
+                .buttonStyle(.borderless) // Borderless prevents conflict with tap gestures in the same HStack (Feedback #2)
+            }
+            .padding(10)
             
-            // Toggle Switch
-            Toggle("", isOn: Binding(
-                get: { self.manager.isProviderEnabled(id) },
-                set: { 
-                    self.manager.setProviderEnabled(id, enabled: $0)
-                    self.manager.refreshAll()
-                }
-            ))
-            .toggleStyle(.switch)
-            .scaleEffect(0.7)
-            .frame(width: 40)
-            .buttonStyle(.borderless) // Borderless prevents conflict with tap gestures in the same HStack (Feedback #2)
+            extraContent()
         }
-        .padding(10)
         .background(Color(NSColor.alternatingContentBackgroundColors[0]))
         .cornerRadius(8)
         .overlay(

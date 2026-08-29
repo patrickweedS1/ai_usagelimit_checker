@@ -167,7 +167,7 @@ struct ContentView: View {
                     
                     // Buckets Progress Bars
                     VStack(spacing: 12) {
-                        ForEach(group.buckets) { bucket in
+                        ForEach(group.buckets.filter { manager.isBucketVisible(provider: snapshot.provider, bucketId: $0.bucketId) }) { bucket in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(bucket.displayName)
                                     .font(.system(size: 10, weight: .bold))
