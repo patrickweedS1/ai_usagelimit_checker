@@ -96,15 +96,25 @@ public class ClaudeClient {
     public static func fetchUsage(manualToken: String? = nil, completion: @escaping (ProviderSnapshot) -> Void) {
         let fetchedAt = Date()
         var resolvedToken = manualToken
+        var resolvedRefreshToken: String? = nil
+        var isFromKeychain = false
+        let username = ProcessInfo.processInfo.environment["USER"] ?? "patrick.weed"
         
         // Auto-detect local credentials if manual token is nil
         if resolvedToken == nil {
-            let username = ProcessInfo.processInfo.environment["USER"] ?? "patrick.weed"
             if let keychainCreds = KeychainHelper.shared.readPassword(service: "Claude Code-credentials", account: username) {
-                // Parse Keychain JSON
+                // Parse Keychain JSON (Feedback #1: Parse nested 'claudeAiOauth' structure)
                 if let data = keychainCreds.data(using: .utf8),
                    let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    resolvedToken = json["access_token"] as? String ?? json["accessToken"] as? String
+                    if let oauth = json["claudeAiOauth"] as? [String: Any] {
+                        resolvedToken = oauth["accessToken"] as? String ?? oauth["access_token"] as? String
+                        resolvedRefreshToken = oauth["refreshToken"] as? String ?? oauth["refresh_token"] as? String
+                        isFromKeychain = true
+                    }
+                    if resolvedToken == nil {
+                        resolvedToken = json["access_token"] as? String ?? json["accessToken"] as? String
+                        resolvedRefreshToken = json["refresh_token"] as? String ?? json["refreshToken"] as? String
+                    }
                 }
             }
         }
@@ -116,6 +126,7 @@ public class ClaudeClient {
             if let data = try? Data(contentsOf: credentialsPath),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 resolvedToken = json["access_token"] as? String ?? json["accessToken"] as? String
+                resolvedRefreshToken = json["refresh_token"] as? String ?? json["refreshToken"] as? String
             }
         }
         
@@ -132,6 +143,27 @@ public class ClaudeClient {
             return
         }
         
+        // Fetch usage and auto-refresh token silently if expired (Feedback #1)
+        fetchUsageWithToken(
+            token: token,
+            refreshToken: resolvedRefreshToken,
+            isFromKeychain: isFromKeychain,
+            username: username,
+            fetchedAt: fetchedAt,
+            retryOnAuthFailure: true,
+            completion: completion
+        )
+    }
+    
+    private static func fetchUsageWithToken(
+        token: String,
+        refreshToken: String?,
+        isFromKeychain: Bool,
+        username: String,
+        fetchedAt: Date,
+        retryOnAuthFailure: Bool,
+        completion: @escaping (ProviderSnapshot) -> Void
+    ) {
         guard let url = URL(string: "https://api.anthropic.com/api/oauth/usage") else { return }
         
         let headers = [
@@ -153,6 +185,50 @@ public class ClaudeClient {
                         groups: [],
                         fetchedAt: fetchedAt
                     ))
+                    return
+                }
+                
+                // If it returned an OAuth authentication_error, we can attempt a refresh!
+                if let errorObj = json["error"] as? [String: Any],
+                   let errorType = errorObj["type"] as? String,
+                   errorType == "authentication_error" {
+                    
+                    if retryOnAuthFailure, let rToken = refreshToken, !rToken.isEmpty {
+                        performTokenRefresh(refreshToken: rToken, isFromKeychain: isFromKeychain, username: username) { refreshedToken in
+                            if let refreshedToken = refreshedToken {
+                                // Retry once with the new access token!
+                                fetchUsageWithToken(
+                                    token: refreshedToken,
+                                    refreshToken: rToken,
+                                    isFromKeychain: isFromKeychain,
+                                    username: username,
+                                    fetchedAt: fetchedAt,
+                                    retryOnAuthFailure: false,
+                                    completion: completion
+                                )
+                            } else {
+                                completion(ProviderSnapshot(
+                                    provider: "claude",
+                                    themeColorName: "orange",
+                                    accountName: "Claude Account",
+                                    status: "error",
+                                    statusDetails: errorObj["message"] as? String ?? "OAuth access token expired and refresh failed.",
+                                    groups: [],
+                                    fetchedAt: fetchedAt
+                                ))
+                            }
+                        }
+                    } else {
+                        completion(ProviderSnapshot(
+                            provider: "claude",
+                            themeColorName: "orange",
+                            accountName: "Claude Account",
+                            status: "error",
+                            statusDetails: errorObj["message"] as? String ?? "OAuth access token expired.",
+                            groups: [],
+                            fetchedAt: fetchedAt
+                        ))
+                    }
                     return
                 }
                 
@@ -271,17 +347,107 @@ public class ClaudeClient {
                 ))
                 
             case .failure(let error):
-                completion(ProviderSnapshot(
-                    provider: "claude",
-                    themeColorName: "orange",
-                    accountName: "Claude Account",
-                    status: "error",
-                    statusDetails: error.localizedDescription,
-                    groups: [],
-                    fetchedAt: fetchedAt
-                ))
+                // If the status is 401 or 403, standard URLSession returns .failure. We attempt refresh!
+                let code = (error as NSError).code
+                if retryOnAuthFailure && (code == 401 || code == 403), let rToken = refreshToken, !rToken.isEmpty {
+                    performTokenRefresh(refreshToken: rToken, isFromKeychain: isFromKeychain, username: username) { refreshedToken in
+                        if let refreshedToken = refreshedToken {
+                            fetchUsageWithToken(
+                                token: refreshedToken,
+                                refreshToken: rToken,
+                                isFromKeychain: isFromKeychain,
+                                username: username,
+                                fetchedAt: fetchedAt,
+                                retryOnAuthFailure: false,
+                                completion: completion
+                            )
+                        } else {
+                            completion(ProviderSnapshot(
+                                provider: "claude",
+                                themeColorName: "orange",
+                                accountName: "Claude Account",
+                                status: "error",
+                                statusDetails: "OAuth access token expired and refresh failed.",
+                                groups: [],
+                                fetchedAt: fetchedAt
+                            ))
+                        }
+                    }
+                } else {
+                    completion(ProviderSnapshot(
+                        provider: "claude",
+                        themeColorName: "orange",
+                        accountName: "Claude Account",
+                        status: "error",
+                        statusDetails: error.localizedDescription,
+                        groups: [],
+                        fetchedAt: fetchedAt
+                    ))
+                }
             }
         }
+    }
+    
+    private static func performTokenRefresh(refreshToken: String, isFromKeychain: Bool, username: String, completion: @escaping (String?) -> Void) {
+        guard let tokenUrl = URL(string: "https://platform.claude.com/v1/oauth/token") else {
+            completion(nil)
+            return
+        }
+        
+        let bodyJson: [String: Any] = [
+            "grant_type": "refresh_token",
+            "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+            "refresh_token": refreshToken
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: bodyJson) else {
+            completion(nil)
+            return
+        }
+        
+        var request = URLRequest(url: tokenUrl)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = bodyData
+        request.timeoutInterval = 15.0
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            guard error == nil,
+                  let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
+                  let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let accessToken = json["access_token"] as? String else {
+                completion(nil)
+                return
+            }
+            
+            let newRefreshToken = json["refresh_token"] as? String ?? refreshToken
+            let expiresAt = (json["expires_in"] as? Double ?? 3600.0) * 1000.0 + Date().timeIntervalSince1970 * 1000.0
+            
+            // Save back to Keychain or config
+            if isFromKeychain {
+                let updatedJson: [String: Any] = [
+                    "claudeAiOauth": [
+                        "accessToken": accessToken,
+                        "refreshToken": newRefreshToken,
+                        "expiresAt": expiresAt,
+                        "scopes": ["user:file_upload", "user:inference", "user:mcp_servers", "user:profile", "user:sessions:claude_code"],
+                        "subscriptionType": "enterprise",
+                        "rateLimitTier": "default_claude_zero"
+                    ]
+                ]
+                if let updatedData = try? JSONSerialization.data(withJSONObject: updatedJson, options: .prettyPrinted),
+                   let updatedString = String(data: updatedData, encoding: .utf8) {
+                    KeychainHelper.shared.savePassword(service: "Claude Code-credentials", account: username, passwordString: updatedString)
+                }
+            } else {
+                // Save manually to our own app's manual token cache
+                QuotaManager.shared.setManualToken(for: "claude", token: accessToken)
+            }
+            
+            completion(accessToken)
+        }
+        task.resume()
     }
 }
 
