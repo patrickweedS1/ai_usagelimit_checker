@@ -111,3 +111,18 @@ Because macOS's browser/download layer does not attach the `com.apple.quarantine
 Upon completion, the app is moved directly to their `/Applications` (or user-specific `~/Applications` as fallback) folder and can be launched directly via double-click or Spotlight without any security warnings!
 
 
+---
+
+## ⚡ Google Antigravity Support (Experimental Branch)
+
+In the `feature/antigravity` branch, we have restored robust support for side-by-side monitoring of **Google Antigravity**:
+
+### How Connection & Auth Works (Antigravity):
+1. **Auto-Detect:** Neurolytics will automatically seek active local Antigravity credentials in:
+   - Your local `.codexbar/antigravity/oauth_creds.json` configuration file.
+   - Your macOS Keychain (service `"gemini"`, account `"antigravity"` or service `"Antigravity Safe Storage"`).
+2. **On-Demand:** If local credentials are not found, clicking **Connect** in Settings starts our local loopback server on port `51121` (whitelisted for Google OAuth redirects) and initiates a Google PKCE authorization flow using public plugin credentials.
+3. **Automatic Token Refreshing:** Google OAuth access tokens are valid for 1 hour. The application automatically refreshes your token in the background using the secure refresh token, ensuring continuous and seamless updates.
+
+
+
