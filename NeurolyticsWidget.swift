@@ -159,25 +159,27 @@ struct NeurolyticsWidgetEntryView : View {
     }
     
     private func isBucketVisible(_ provider: String, bucketId: String, prefs: [String: Bool]) -> Bool {
-        let type: String
         let bId = bucketId.lowercased()
+        let type: String
         if provider == "claude" {
-            if bId.contains("session") || bId.contains("5h") {
-                type = "5h"
-            } else if bId.contains("weekly") {
-                type = "weekly"
-            } else if bId.contains("extra") {
+            if bId.contains("extra") || bId.contains("spend") {
                 type = "extra"
             } else {
                 return true
             }
         } else if provider == "antigravity" {
-            if bId.contains("five_hour") || bId.contains("session") || bId.contains("5h") || bId.contains("five-hour") {
-                type = "5h"
-            } else if bId.contains("weekly") {
-                type = "weekly"
+            let isClaudeOrGPT = bId.contains("claude") || bId.contains("gpt") || bId.contains("openai") || bId.contains("chatgpt")
+            let is5h = bId.contains("five_hour") || bId.contains("session") || bId.contains("5h") || bId.contains("five-hour") || bId.contains("hour")
+            let isWeekly = bId.contains("weekly")
+            
+            if isClaudeOrGPT {
+                if is5h { type = "claude-5h" }
+                else if isWeekly { type = "claude-weekly" }
+                else { return true }
             } else {
-                return true
+                if is5h { type = "gemini-5h" }
+                else if isWeekly { type = "gemini-weekly" }
+                else { return true }
             }
         } else {
             return true

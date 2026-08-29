@@ -143,18 +143,6 @@ struct SettingsView: View {
                                 .tracking(0.5)
                             
                             HStack(spacing: 12) {
-                                Toggle("5-Hour Limit", isOn: Binding(
-                                    get: { self.manager.isBucketTypeVisible(provider: "claude", type: "5h") },
-                                    set: { self.manager.setBucketTypeVisible(provider: "claude", type: "5h", visible: $0) }
-                                ))
-                                .disabled(!isClaudeConnected)
-                                
-                                Toggle("Weekly Limit", isOn: Binding(
-                                    get: { self.manager.isBucketTypeVisible(provider: "claude", type: "weekly") },
-                                    set: { self.manager.setBucketTypeVisible(provider: "claude", type: "weekly", visible: $0) }
-                                ))
-                                .disabled(!isClaudeConnected)
-                                
                                 Toggle("Overage Credits", isOn: Binding(
                                     get: { self.manager.isBucketTypeVisible(provider: "claude", type: "extra") },
                                     set: { self.manager.setBucketTypeVisible(provider: "claude", type: "extra", visible: $0) }
@@ -204,29 +192,52 @@ struct SettingsView: View {
                             .padding(.horizontal, 10)
                             .padding(.bottom, 6)
                         
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("LIMIT OPTIONS TO DISPLAY:")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(.secondary)
-                                .tracking(0.5)
-                            
-                            HStack(spacing: 12) {
-                                Toggle("5-Hour Limit", isOn: Binding(
-                                    get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "5h") },
-                                    set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "5h", visible: $0) }
-                                ))
-                                .disabled(!isAntigravityConnected)
+                        VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("GEMINI MODELS LIMITS:")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(.secondary)
+                                    .tracking(0.5)
                                 
-                                Toggle("Weekly Limit", isOn: Binding(
-                                    get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "weekly") },
-                                    set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "weekly", visible: $0) }
-                                ))
-                                .disabled(!isAntigravityConnected)
+                                HStack(spacing: 12) {
+                                    Toggle("5-Hour Limit", isOn: Binding(
+                                        get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "gemini-5h") },
+                                        set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "gemini-5h", visible: $0) }
+                                    ))
+                                    .disabled(!isAntigravityConnected)
+                                    
+                                    Toggle("Weekly Limit", isOn: Binding(
+                                        get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "gemini-weekly") },
+                                        set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "gemini-weekly", visible: $0) }
+                                    ))
+                                    .disabled(!isAntigravityConnected)
+                                }
                             }
-                            .toggleStyle(.checkbox)
-                            .font(.system(size: 9.5))
-                            .foregroundColor(isAntigravityConnected ? .primary : .secondary.opacity(0.4))
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("CLAUDE & GPT MODELS LIMITS:")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(.secondary)
+                                    .tracking(0.5)
+                                
+                                HStack(spacing: 12) {
+                                    Toggle("5-Hour Limit", isOn: Binding(
+                                        get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "claude-5h") },
+                                        set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "claude-5h", visible: $0) }
+                                    ))
+                                    .disabled(!isAntigravityConnected)
+                                    
+                                    Toggle("Weekly Limit", isOn: Binding(
+                                        get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "claude-weekly") },
+                                        set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "claude-weekly", visible: $0) }
+                                    ))
+                                    .disabled(!isAntigravityConnected)
+                                }
+                            }
                         }
+                        .toggleStyle(.checkbox)
+                        .font(.system(size: 9.5))
+                        .foregroundColor(isAntigravityConnected ? .primary : .secondary.opacity(0.4))
                         .padding(.horizontal, 12)
                         .padding(.bottom, 10)
                     }

@@ -95,11 +95,11 @@ public class QuotaManager: ObservableObject {
             }
         } else {
             let defaults = [
-                "claude-5h": true,
-                "claude-weekly": true,
                 "claude-extra": true,
-                "antigravity-5h": true,
-                "antigravity-weekly": true
+                "antigravity-gemini-5h": true,
+                "antigravity-gemini-weekly": true,
+                "antigravity-claude-5h": true,
+                "antigravity-claude-weekly": true
             ]
             self.visiblePreferences = defaults
             savePreferences(defaults)
@@ -141,18 +141,20 @@ public class QuotaManager: ObservableObject {
     public func getBucketType(provider: String, bucketId: String) -> String {
         let bId = bucketId.lowercased()
         if provider == "claude" {
-            if bId.contains("session") || bId.contains("5h") {
-                return "5h"
-            } else if bId.contains("weekly") {
-                return "weekly"
-            } else if bId.contains("extra") {
+            if bId.contains("extra") || bId.contains("spend") {
                 return "extra"
             }
         } else if provider == "antigravity" {
-            if bId.contains("five_hour") || bId.contains("session") || bId.contains("5h") || bId.contains("five-hour") {
-                return "5h"
-            } else if bId.contains("weekly") {
-                return "weekly"
+            let isClaudeOrGPT = bId.contains("claude") || bId.contains("gpt") || bId.contains("openai") || bId.contains("chatgpt")
+            let is5h = bId.contains("five_hour") || bId.contains("session") || bId.contains("5h") || bId.contains("five-hour") || bId.contains("hour")
+            let isWeekly = bId.contains("weekly")
+            
+            if isClaudeOrGPT {
+                if is5h { return "claude-5h" }
+                if isWeekly { return "claude-weekly" }
+            } else {
+                if is5h { return "gemini-5h" }
+                if isWeekly { return "gemini-weekly" }
             }
         }
         return "other"
