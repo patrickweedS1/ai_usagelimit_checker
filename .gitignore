@@ -1,0 +1,26 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon caches
+Icon\r
+
+# Files that might contain sensitive info
+.env
+.env.local
+*.key
+*.token
+
+# Compilation outputs
+build/
+output/
+bin/
+*.app/
+*.appex/
+*.o
+*.d
+*.swiftdeps
+*.swiftmodule
+*.pyc
+__pycache__/
