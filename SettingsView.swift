@@ -41,22 +41,21 @@ struct SettingsView: View {
             // Segmented tab selector
             HStack(spacing: 12) {
                 ForEach(SettingsTab.allCases) { tab in
-                    Button(action: { activeTab = tab }) {
-                        VStack(spacing: 4) {
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 16))
-                            Text(tab.rawValue)
-                                .font(.system(size: 11, weight: activeTab == tab ? .semibold : .regular))
-                        }
-                        .foregroundColor(activeTab == tab ? .blue : .primary.opacity(0.7))
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 16)
-                        .contentShape(Rectangle()) // Make the entire padded box area clickable (Feedback #1)
-                        .background(activeTab == tab ? Color.blue.opacity(0.08) : Color.clear)
-                        .cornerRadius(6)
+                    VStack(spacing: 4) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 16))
+                        Text(tab.rawValue)
+                            .font(.system(size: 11, weight: activeTab == tab ? .semibold : .regular))
                     }
-                    .buttonStyle(.plain)
-                    .focusable(false) // Disable keyboard focus highlight boxes (Feedback #2)
+                    .foregroundColor(activeTab == tab ? .blue : .primary.opacity(0.7))
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .contentShape(Rectangle()) // Make the entire padded box area clickable (Feedback #1)
+                    .background(activeTab == tab ? Color.blue.opacity(0.08) : Color.clear)
+                    .cornerRadius(6)
+                    .onTapGesture {
+                        activeTab = tab
+                    }
                 }
             }
             .padding(.horizontal)
@@ -185,14 +184,14 @@ struct SettingsView: View {
                     icon: "square.grid.3x1.below.line.grid.1x2",
                     color: .indigo,
                     connectAction: {
-                        // Open Devin settings natively in the user's browser (Feedback #5)
-                        if let url = URL(string: "https://devin.ai/settings") {
+                        // Open app.devin.ai natively in the user's browser (Feedback #3 & #5)
+                        if let url = URL(string: "https://app.devin.ai") {
                             NSWorkspace.shared.open(url)
                         }
                         selectedProviderForToken = "devin"
                         tokenInput = manager.getManualToken(for: "devin") ?? ""
                         devinOrgInput = UserDefaults.standard.string(forKey: "DevinOrgId") ?? ""
-                        authErrorMessage = "Opened Devin Settings in your browser. Generate or copy your API Key and paste it below."
+                        authErrorMessage = "Opened Devin in your browser. Please create or copy your service user API key (starts with cog_) and paste it below."
                         showTokenSheet = true
                     }
                 )
@@ -243,18 +242,20 @@ struct SettingsView: View {
             
             Spacer()
             
-            // Connect Button
-            Button(action: connectAction) {
-                Text(isConnected ? "Connected" : "Connect")
-                    .font(.system(size: 10, weight: .semibold))
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 10)
-                    .background(isConnected ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
-                    .foregroundColor(isConnected ? .green : .blue)
-                    .cornerRadius(4)
-            }
-            .buttonStyle(.plain)
-            .disabled(isAuthenticating)
+            // Connect Button styled with TapGesture to resolve SwiftUI row-clamping & focus ring bugs (Feedback #2 & #5)
+            Text(isConnected ? "Connected" : "Connect")
+                .font(.system(size: 10, weight: .semibold))
+                .padding(.vertical, 4)
+                .padding(.horizontal, 10)
+                .background(isConnected ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
+                .foregroundColor(isConnected ? .green : .blue)
+                .cornerRadius(4)
+                .contentShape(Rectangle()) // Make the entire capsule area clickable
+                .onTapGesture {
+                    if !isAuthenticating {
+                        connectAction()
+                    }
+                }
             
             // Toggle Switch
             Toggle("", isOn: Binding(
@@ -267,6 +268,7 @@ struct SettingsView: View {
             .toggleStyle(.switch)
             .scaleEffect(0.7)
             .frame(width: 40)
+            .buttonStyle(.borderless) // Borderless prevents conflict with tap gestures in the same HStack (Feedback #2)
         }
         .padding(10)
         .background(Color(NSColor.alternatingContentBackgroundColors[0]))
