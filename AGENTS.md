@@ -68,3 +68,23 @@ Each provider supports a **Dual-Mode** connection design:
 - **Theme Selection:** Set the interface to **Light Mode**, **Dark Mode**, or let it copy your macOS system state dynamically (default).
 - **Toolbar Optional:** Toggle `"Show in toolbar"`. If unchecked, Neurolytics runs silently in the background, feeding the Desktop Widget and open settings windows without cluttering your Mac's Menu Bar.
 - **Warning Indicator:** Set your warning slider (default 85%). If your remaining quota dips below this, progress bars glow red to alert you!
+
+---
+
+## 📥 AirDrop / Gatekeeper Quarantine ("App is Damaged")
+
+When you build a native, unsigned macOS `.app` bundle on one Mac and send it over **AirDrop, Slack, or Email** to another Mac, macOS's security layer (Gatekeeper) automatically attaches an extended attribute called a **quarantine flag** to the bundle.
+
+On the receiving Mac, when you double-click the app, macOS will display an alarm: 
+> **"Neurolytics" is damaged and can't be opened. You should move it to the Trash.**
+
+### **The 5-Second Fix:**
+This is completely normal for local, unsigned developer app bundles. You simply need to clear the quarantine flag in your terminal on the receiving Mac:
+
+1. Open your terminal on your personal laptop.
+2. Run this single command (replace with your actual folder path where you dropped the app, e.g. `~/Downloads` or `/Applications`):
+   ```bash
+   xattr -rd com.apple.quarantine /Applications/Neurolytics.app
+   ```
+3. **Success!** Double-click the app, and it will open and run natively and beautifully!
+
