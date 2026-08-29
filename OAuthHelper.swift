@@ -174,7 +174,7 @@ public class OAuthHelper {
         var authComponents = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
         authComponents.queryItems = [
             URLQueryItem(name: "client_id", value: "32555940559.apps.googleusercontent.com"), // Standard Google Cloud SDK Client
-            URLQueryItem(name: "redirect_uri", value: "http://localhost:\(port)/callback"),
+            URLQueryItem(name: "redirect_uri", value: "http://localhost:\(port)"), // Root loopback with no path suffix (Feedback #4)
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "scope", value: "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email"),
             URLQueryItem(name: "code_challenge", value: challenge),
@@ -198,9 +198,10 @@ public class OAuthHelper {
         bodyComponents.queryItems = [
             URLQueryItem(name: "grant_type", value: "authorization_code"),
             URLQueryItem(name: "client_id", value: "32555940559.apps.googleusercontent.com"),
+            URLQueryItem(name: "client_secret", value: "ZmssLNjJy2998hD4CTg2ejr2"), // Crucial Google SDK Client Secret!
             URLQueryItem(name: "code", value: code),
             URLQueryItem(name: "code_verifier", value: verifier),
-            URLQueryItem(name: "redirect_uri", value: "http://localhost:\(port)/callback")
+            URLQueryItem(name: "redirect_uri", value: "http://localhost:\(port)") // Root loopback with no path suffix (Feedback #4)
         ]
         
         guard let bodyString = bodyComponents.percentEncodedQuery,
