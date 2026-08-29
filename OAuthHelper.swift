@@ -144,6 +144,134 @@ public class OAuthHelper {
         task.resume()
     }
     
+    // MARK: - Google (Antigravity) OAuth PKCE Flow
+    
+    public func startGoogleLoginFlow(completion: @escaping (Result<String, Error>) -> Void) {
+        let googlePort: UInt16 = 51121
+        let googleClientId = QuotaManager.shared.googleClientId
+        
+        guard !googleClientId.isEmpty else {
+            completion(.failure(NSError(domain: "OAuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Google Client ID is missing. Please configure it in Settings first."])))
+            return
+        }
+        
+        let verifier = generateRandomString(length: 64)
+        let challenge = sha256Base64URLEncoded(string: verifier)
+        let state = generateRandomString(length: 16)
+        
+        self.currentVerifier = verifier
+        self.currentState = state
+        
+        callbackServer?.stop()
+        
+        callbackServer = LocalCallbackServer(port: googlePort) { [weak self] code, returnedState in
+            guard let self = self else { return }
+            self.callbackServer?.stop()
+            self.callbackServer = nil
+            
+            guard returnedState == self.currentState else {
+                completion(.failure(NSError(domain: "OAuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "State parameter mismatch. Security check failed."])))
+                return
+            }
+            
+            self.exchangeGoogleCodeForTokens(code: code, verifier: verifier, state: returnedState, completion: completion)
+        }
+        
+        callbackServer?.start()
+        
+        var authComponents = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
+        authComponents.queryItems = [
+            URLQueryItem(name: "client_id", value: googleClientId),
+            URLQueryItem(name: "redirect_uri", value: "http://localhost:\(googlePort)/oauth-callback"),
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "scope", value: "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/cclog https://www.googleapis.com/auth/experimentsandconfigs"),
+            URLQueryItem(name: "code_challenge", value: challenge),
+            URLQueryItem(name: "code_challenge_method", value: "S256"),
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "access_type", value: "offline"),
+            URLQueryItem(name: "prompt", value: "consent")
+        ]
+        
+        if let authUrl = authComponents.url {
+            NSWorkspace.shared.open(authUrl)
+        } else {
+            completion(.failure(NSError(domain: "OAuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not build Google Auth URL."])))
+        }
+    }
+    
+    private func exchangeGoogleCodeForTokens(code: String, verifier: String, state: String, completion: @escaping (Result<String, Error>) -> Void) {
+        guard let tokenUrl = URL(string: "https://oauth2.googleapis.com/token") else { return }
+        let googlePort: UInt16 = 51121
+        
+        let googleClientId = QuotaManager.shared.googleClientId
+        let googleClientSecret = QuotaManager.shared.googleClientSecret
+        
+        let bodyComponents = [
+            "grant_type=authorization_code",
+            "client_id=\(googleClientId)",
+            "client_secret=\(googleClientSecret)",
+            "code=\(code)",
+            "code_verifier=\(verifier)",
+            "redirect_uri=http://localhost:\(googlePort)/oauth-callback"
+        ]
+        
+        let bodyString = bodyComponents.joined(separator: "&")
+        guard let bodyData = bodyString.data(using: .utf8) else { return }
+        
+        var request = URLRequest(url: tokenUrl)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.setValue("antigravity", forHTTPHeaderField: "User-Agent")
+        request.httpBody = bodyData
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
+                  let data = data else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                let rawErr = data != nil ? (String(data: data!, encoding: .utf8) ?? "") : ""
+                completion(.failure(NSError(domain: "OAuthError", code: status, userInfo: [NSLocalizedDescriptionKey: "Google token exchange failed (status \(status)): \(rawErr)"])))
+                return
+            }
+            
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let accessToken = json["access_token"] as? String {
+                    
+                    let refreshToken = json["refresh_token"] as? String ?? ""
+                    let expiresAt = (json["expires_in"] as? Double ?? 3600.0) * 1000.0 + Date().timeIntervalSince1970 * 1000.0
+                    
+                    let tokenJson: [String: Any] = [
+                        "access_token": accessToken,
+                        "accessToken": accessToken,
+                        "refresh_token": refreshToken,
+                        "refreshToken": refreshToken,
+                        "expires_at": expiresAt,
+                        "expiresAt": expiresAt
+                    ]
+                    
+                    if let tokenData = try? JSONSerialization.data(withJSONObject: tokenJson),
+                       let tokenString = String(data: tokenData, encoding: .utf8) {
+                        QuotaManager.shared.setManualToken(for: "antigravity", token: tokenString)
+                    } else {
+                        QuotaManager.shared.setManualToken(for: "antigravity", token: accessToken)
+                    }
+                    
+                    completion(.success(accessToken))
+                } else {
+                    completion(.failure(NSError(domain: "OAuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Missing access token in Google response."])))
+                }
+            } catch {
+                completion(.failure(error))
+            }
+        }
+        task.resume()
+    }
+
 
 }
 
@@ -219,7 +347,7 @@ internal class LocalCallbackServer {
                                 <div class="card">
                                     <div style="font-size: 54px;">🧠</div>
                                     <h1>Neurolytics Connected!</h1>
-                                    <p>Your Claude account has been successfully authenticated.<br><br>You can now safely <b>close this tab</b> and return to the Neurolytics app.</p>
+                                    <p>Your account has been successfully authenticated.<br><br>You can now safely <b>close this tab</b> and return to the Neurolytics app.</p>
                                 </div>
                             </body>
                             </html>

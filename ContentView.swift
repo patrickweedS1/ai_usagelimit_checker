@@ -154,46 +154,50 @@ struct ContentView: View {
             
             // Subsections for each Model Group
             ForEach(snapshot.groups) { group in
-                VStack(alignment: .leading, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(group.displayName)
-                            .font(.system(size: 11, weight: .black, design: .rounded))
-                            .tracking(0.5)
+                let visibleBuckets = group.buckets.filter { manager.isBucketVisible(provider: snapshot.provider, bucketId: $0.bucketId) }
+                
+                if !visibleBuckets.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(group.displayName)
+                                .font(.system(size: 11, weight: .black, design: .rounded))
+                                .tracking(0.5)
+                            
+                            Text(group.description)
+                                .font(.system(size: 8.5))
+                                .foregroundColor(.secondary)
+                        }
                         
-                        Text(group.description)
-                            .font(.system(size: 8.5))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    // Buckets Progress Bars
-                    VStack(spacing: 12) {
-                        ForEach(group.buckets) { bucket in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(bucket.displayName)
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.primary.opacity(0.85))
-                                
-                                // Beautiful rounded pill progress bar
-                                HStack(spacing: 10) {
-                                    CustomProgressBar(
-                                        usedValue: bucket.usedPercent,
-                                        warningThreshold: manager.warningThreshold,
-                                        color: providerColor
-                                    )
+                        // Buckets Progress Bars
+                        VStack(spacing: 12) {
+                            ForEach(visibleBuckets) { bucket in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(bucket.displayName)
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.primary.opacity(0.85))
                                     
-                                    Text("\(String(format: "%.2f", bucket.usedPercent))%")
-                                        .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                                        .frame(width: 54, alignment: .trailing)
+                                    // Beautiful rounded pill progress bar
+                                    HStack(spacing: 10) {
+                                        CustomProgressBar(
+                                            usedValue: bucket.usedPercent,
+                                            warningThreshold: manager.warningThreshold,
+                                            color: providerColor
+                                        )
+                                        
+                                        Text("\(String(format: "%.2f", bucket.usedPercent))%")
+                                            .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                            .frame(width: 54, alignment: .trailing)
+                                    }
+                                    
+                                    // Metadata resetting description
+                                    Text("\(String(format: "%.0f", bucket.usedPercent))% used · \(bucket.resetsAt?.relativeResetTimeDescription() ?? bucket.resetsDescription)")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.secondary)
                                 }
-                                
-                                // Metadata resetting description
-                                Text("\(String(format: "%.0f", bucket.usedPercent))% used · \(bucket.resetsAt?.relativeResetTimeDescription() ?? bucket.resetsDescription)")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.secondary)
                             }
                         }
+                        .padding(.leading, 6)
                     }
-                    .padding(.leading, 6)
                 }
             }
         }

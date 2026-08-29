@@ -451,4 +451,333 @@ public class ClaudeClient {
     }
 }
 
+// MARK: - Antigravity Client
+public class AntigravityClient {
+    public static func fetchUsage(manualToken: String? = nil, completion: @escaping (ProviderSnapshot) -> Void) {
+        let fetchedAt = Date()
+        var resolvedToken: String? = nil
+        var resolvedRefreshToken: String? = nil
+        var isFromKeychain = false
+        
+        // 1. Try to read from manual token stored in Keychain (which is now a structured JSON string)
+        if let tokenString = manualToken ?? QuotaManager.shared.getManualToken(for: "antigravity") {
+            if let data = tokenString.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                resolvedToken = json["access_token"] as? String ?? json["accessToken"] as? String
+                resolvedRefreshToken = json["refresh_token"] as? String ?? json["refreshToken"] as? String
+                isFromKeychain = true
+            } else {
+                resolvedToken = tokenString
+            }
+        }
+        
+        // 2. Fallback to local codexbar/antigravity CLI configuration file if still nil
+        if resolvedToken == nil {
+            let homeDir = NSHomeDirectory()
+            let oauthCredsPath = URL(fileURLWithPath: homeDir).appendingPathComponent(".codexbar/antigravity/oauth_creds.json")
+            if let data = try? Data(contentsOf: oauthCredsPath),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                resolvedToken = json["access_token"] as? String ?? json["accessToken"] as? String
+                resolvedRefreshToken = json["refresh_token"] as? String ?? json["refreshToken"] as? String
+            }
+        }
+        
+        // 3. Fallback to official Antigravity CLI Keychain entries
+        if resolvedToken == nil {
+            if let keychainCreds = KeychainHelper.shared.readPassword(service: "gemini", account: "antigravity") {
+                if let data = keychainCreds.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    resolvedToken = json["access_token"] as? String ?? json["accessToken"] as? String
+                    resolvedRefreshToken = json["refresh_token"] as? String ?? json["refreshToken"] as? String
+                } else {
+                    resolvedToken = keychainCreds
+                }
+            }
+        }
+        if resolvedToken == nil {
+            if let keychainCreds = KeychainHelper.shared.readPassword(service: "Antigravity Safe Storage", account: "token") ??
+                                   KeychainHelper.shared.readPassword(service: "Antigravity Safe Storage", account: "antigravity") {
+                if let data = keychainCreds.data(using: .utf8),
+                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    resolvedToken = json["access_token"] as? String ?? json["accessToken"] as? String
+                    resolvedRefreshToken = json["refresh_token"] as? String ?? json["refreshToken"] as? String
+                } else {
+                    resolvedToken = keychainCreds
+                }
+            }
+        }
+        
+        guard let token = resolvedToken, !token.isEmpty else {
+            completion(ProviderSnapshot(
+                provider: "antigravity",
+                themeColorName: "violet",
+                accountName: "Antigravity Account",
+                status: "auth_missing",
+                statusDetails: "No Antigravity credentials found. Please run 'agy' CLI first or connect in Settings.",
+                groups: [],
+                fetchedAt: fetchedAt
+            ))
+            return
+        }
+        
+        fetchUsageWithToken(
+            token: token,
+            refreshToken: resolvedRefreshToken,
+            isFromKeychain: isFromKeychain,
+            fetchedAt: fetchedAt,
+            retryOnAuthFailure: true,
+            completion: completion
+        )
+    }
+    
+    private static func fetchUsageWithToken(
+        token: String,
+        refreshToken: String?,
+        isFromKeychain: Bool,
+        fetchedAt: Date,
+        retryOnAuthFailure: Bool,
+        completion: @escaping (ProviderSnapshot) -> Void
+    ) {
+        guard let url = URL(string: "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary") else { return }
+        
+        let headers = [
+            "Authorization": "Bearer \(token)",
+            "Content-Type": "application/json",
+            "User-Agent": "antigravity"
+        ]
+        
+        let bodyJson: [String: Any] = [:]
+        let bodyData = try? JSONSerialization.data(withJSONObject: bodyJson)
+        
+        NetworkHelper.performRequest(url: url, method: "POST", headers: headers, body: bodyData) { result in
+            switch result {
+            case .success(let data):
+                guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    completion(ProviderSnapshot(
+                        provider: "antigravity",
+                        themeColorName: "violet",
+                        accountName: "Antigravity Account",
+                        status: "error",
+                        statusDetails: "Invalid JSON response from Google.",
+                        groups: [],
+                        fetchedAt: fetchedAt
+                    ))
+                    return
+                }
+                
+                if let errorObj = json["error"] as? [String: Any],
+                   let errorStatus = errorObj["status"] as? String,
+                   (errorStatus == "UNAUTHENTICATED" || errorStatus == "PERMISSION_DENIED" || errorObj["code"] as? Int == 401) {
+                    
+                    if retryOnAuthFailure, let rToken = refreshToken, !rToken.isEmpty {
+                        performTokenRefresh(refreshToken: rToken, isFromKeychain: isFromKeychain) { refreshedToken in
+                            if let refreshedToken = refreshedToken {
+                                fetchUsageWithToken(
+                                    token: refreshedToken,
+                                    refreshToken: rToken,
+                                    isFromKeychain: isFromKeychain,
+                                    fetchedAt: fetchedAt,
+                                    retryOnAuthFailure: false,
+                                    completion: completion
+                                )
+                            } else {
+                                completion(ProviderSnapshot(
+                                    provider: "antigravity",
+                                    themeColorName: "violet",
+                                    accountName: "Antigravity Account",
+                                    status: "error",
+                                    statusDetails: "Google token expired and refresh failed.",
+                                    groups: [],
+                                    fetchedAt: fetchedAt
+                                ))
+                            }
+                        }
+                    } else {
+                        completion(ProviderSnapshot(
+                            provider: "antigravity",
+                            themeColorName: "violet",
+                            accountName: "Antigravity Account",
+                            status: "error",
+                            statusDetails: "Google token expired or unauthorized.",
+                            groups: [],
+                            fetchedAt: fetchedAt
+                        ))
+                    }
+                    return
+                }
+                
+                guard let groupsArray = json["groups"] as? [[String: Any]] else {
+                    completion(ProviderSnapshot(
+                        provider: "antigravity",
+                        themeColorName: "violet",
+                        accountName: "Antigravity Account",
+                        status: "error",
+                        statusDetails: "No quota groups found in Google response.",
+                        groups: [],
+                        fetchedAt: fetchedAt
+                    ))
+                    return
+                }
+                
+                var modelGroups: [ModelGroup] = []
+                
+                for groupObj in groupsArray {
+                    guard let displayName = groupObj["displayName"] as? String,
+                          let description = groupObj["description"] as? String,
+                          let bucketsArray = groupObj["buckets"] as? [[String: Any]] else { continue }
+                    
+                    var buckets: [QuotaBucket] = []
+                    
+                    for bucketObj in bucketsArray {
+                        guard let bucketId = bucketObj["bucketId"] as? String,
+                              let bDisplayName = bucketObj["displayName"] as? String,
+                              let window = bucketObj["window"] as? String,
+                              let remainingFraction = bucketObj["remainingFraction"] as? Double else { continue }
+                        
+                        let resetTimeStr = bucketObj["resetTime"] as? String
+                        let resetsAt = resetTimeStr != nil ? ISO8601DateFormatter().date(from: resetTimeStr!) : nil
+                        
+                        let remainingPercent = remainingFraction * 100.0
+                        let usedPercent = max(0.0, 100.0 - remainingPercent)
+                        
+                        buckets.append(QuotaBucket(
+                            bucketId: bucketId,
+                            displayName: bDisplayName,
+                            windowType: window,
+                            usedPercent: usedPercent,
+                            remainingPercent: remainingPercent,
+                            resetsAt: resetsAt,
+                            resetsDescription: resetsAt?.relativeResetTimeDescription() ?? "Quota available"
+                        ))
+                    }
+                    
+                    modelGroups.append(ModelGroup(
+                        displayName: displayName.uppercased(),
+                        description: description,
+                        buckets: buckets
+                    ))
+                }
+                
+                // Decode account email from JWT
+                var email = "Antigravity Account"
+                let parts = token.components(separatedBy: ".")
+                if parts.count > 1,
+                   let payloadData = Data(base64Encoded: parts[1] + String(repeating: "=", count: (4 - parts[1].count % 4) % 4)),
+                   let payloadJson = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] {
+                    email = payloadJson["email"] as? String ?? payloadJson["sub"] as? String ?? "Antigravity Account"
+                }
+                
+                completion(ProviderSnapshot(
+                    provider: "antigravity",
+                    themeColorName: "violet",
+                    accountName: email,
+                    status: "ok",
+                    statusDetails: nil,
+                    groups: modelGroups,
+                    fetchedAt: fetchedAt
+                ))
+                
+            case .failure(let error):
+                let code = (error as NSError).code
+                if retryOnAuthFailure && (code == 401 || code == 403), let rToken = refreshToken, !rToken.isEmpty {
+                    performTokenRefresh(refreshToken: rToken, isFromKeychain: isFromKeychain) { refreshedToken in
+                        if let refreshedToken = refreshedToken {
+                            fetchUsageWithToken(
+                                token: refreshedToken,
+                                refreshToken: rToken,
+                                isFromKeychain: isFromKeychain,
+                                fetchedAt: fetchedAt,
+                                retryOnAuthFailure: false,
+                                completion: completion
+                            )
+                        } else {
+                            completion(ProviderSnapshot(
+                                provider: "antigravity",
+                                themeColorName: "violet",
+                                accountName: "Antigravity Account",
+                                status: "error",
+                                statusDetails: "Google token expired and refresh failed.",
+                                groups: [],
+                                fetchedAt: fetchedAt
+                            ))
+                        }
+                    }
+                } else {
+                    completion(ProviderSnapshot(
+                        provider: "antigravity",
+                        themeColorName: "violet",
+                        accountName: "Antigravity Account",
+                        status: "error",
+                        statusDetails: error.localizedDescription,
+                        groups: [],
+                        fetchedAt: fetchedAt
+                    ))
+                }
+            }
+        }
+    }
+    
+    private static func performTokenRefresh(refreshToken: String, isFromKeychain: Bool, completion: @escaping (String?) -> Void) {
+        guard let tokenUrl = URL(string: "https://oauth2.googleapis.com/token") else {
+            completion(nil)
+            return
+        }
+        
+        let googleClientId = QuotaManager.shared.googleClientId
+        let googleClientSecret = QuotaManager.shared.googleClientSecret
+        
+        let bodyComponents = [
+            "grant_type=refresh_token",
+            "client_id=\(googleClientId)",
+            "client_secret=\(googleClientSecret)",
+            "refresh_token=\(refreshToken)"
+        ]
+        
+        let bodyString = bodyComponents.joined(separator: "&")
+        guard let bodyData = bodyString.data(using: .utf8) else {
+            completion(nil)
+            return
+        }
+        
+        var request = URLRequest(url: tokenUrl)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = bodyData
+        request.timeoutInterval = 15.0
+        
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            guard error == nil,
+                  let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
+                  let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let accessToken = json["access_token"] as? String else {
+                completion(nil)
+                return
+            }
+            
+            let newRefreshToken = json["refresh_token"] as? String ?? refreshToken
+            let expiresAt = (json["expires_in"] as? Double ?? 3600.0) * 1000.0 + Date().timeIntervalSince1970 * 1000.0
+            
+            let tokenJson: [String: Any] = [
+                "access_token": accessToken,
+                "accessToken": accessToken,
+                "refresh_token": newRefreshToken,
+                "refreshToken": newRefreshToken,
+                "expires_at": expiresAt,
+                "expiresAt": expiresAt
+            ]
+            
+            if let tokenData = try? JSONSerialization.data(withJSONObject: tokenJson),
+               let tokenString = String(data: tokenData, encoding: .utf8) {
+                QuotaManager.shared.setManualToken(for: "antigravity", token: tokenString)
+            } else {
+                QuotaManager.shared.setManualToken(for: "antigravity", token: accessToken)
+            }
+            
+            completion(accessToken)
+        }
+        task.resume()
+    }
+}
+
 

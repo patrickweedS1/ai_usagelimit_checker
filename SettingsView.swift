@@ -21,6 +21,11 @@ struct SettingsView: View {
     @State private var authErrorMessage: String = ""
     @State private var isAuthenticating: Bool = false
     
+    // Google OAuth Custom Client States
+    @State private var showGoogleCredentialsSheet: Bool = false
+    @State private var googleClientIdInput: String = ""
+    @State private var googleClientSecretInput: String = ""
+    
     enum SettingsTab: String, CaseIterable, Identifiable {
         case providers = "Providers"
         case general = "General"
@@ -90,6 +95,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showTokenSheet) {
             tokenConfigurationSheet
         }
+        .sheet(isPresented: $showGoogleCredentialsSheet) {
+            googleCredentialsConfigurationSheet
+        }
     }
     
     // MARK: - Providers Tab
@@ -103,7 +111,7 @@ struct SettingsView: View {
             
             VStack(spacing: 12) {
                 // Claude Card
-                providerRow(
+                providerCard(
                     id: "claude",
                     name: "Claude Code",
                     subtitle: "Anthropic's CLI & API usage limits",
@@ -128,83 +136,188 @@ struct SettingsView: View {
                             }
                         }
                     }
-                )
+                ) {
+                    let isClaudeConnected = manager.snapshots.first(where: { $0.provider == "claude" })?.status == "ok"
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Divider()
+                            .padding(.horizontal, 10)
+                            .padding(.bottom, 6)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("LIMIT OPTIONS TO DISPLAY:")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(.secondary)
+                                .tracking(0.5)
+                            
+                            HStack(spacing: 12) {
+                                Toggle("Overage Credits", isOn: Binding(
+                                    get: { self.manager.isBucketTypeVisible(provider: "claude", type: "extra") },
+                                    set: { self.manager.setBucketTypeVisible(provider: "claude", type: "extra", visible: $0) }
+                                ))
+                                .disabled(!isClaudeConnected)
+                            }
+                            .toggleStyle(.checkbox)
+                            .font(.system(size: 9.5))
+                            .foregroundColor(isClaudeConnected ? .primary : .secondary.opacity(0.4))
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                    }
+                }
+                
+                // Antigravity Card
+                providerCard(
+                    id: "antigravity",
+                    name: "Antigravity",
+                    subtitle: "Google's AI IDE & API usage limits",
+                    icon: "sparkles",
+                    color: .purple,
+                    connectAction: {
+                        googleClientIdInput = manager.googleClientId
+                        googleClientSecretInput = manager.googleClientSecret
+                        authErrorMessage = ""
+                        showGoogleCredentialsSheet = true
+                    }
+                ) {
+                    let isAntigravityConnected = manager.snapshots.first(where: { $0.provider == "antigravity" })?.status == "ok"
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Divider()
+                            .padding(.horizontal, 10)
+                            .padding(.bottom, 6)
+                        
+                        VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("GEMINI MODELS LIMITS:")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(.secondary)
+                                    .tracking(0.5)
+                                
+                                HStack(spacing: 12) {
+                                    Toggle("5-Hour Limit", isOn: Binding(
+                                        get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "gemini-5h") },
+                                        set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "gemini-5h", visible: $0) }
+                                    ))
+                                    .disabled(!isAntigravityConnected)
+                                    
+                                    Toggle("Weekly Limit", isOn: Binding(
+                                        get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "gemini-weekly") },
+                                        set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "gemini-weekly", visible: $0) }
+                                    ))
+                                    .disabled(!isAntigravityConnected)
+                                }
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("CLAUDE & GPT MODELS LIMITS:")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(.secondary)
+                                    .tracking(0.5)
+                                
+                                HStack(spacing: 12) {
+                                    Toggle("5-Hour Limit", isOn: Binding(
+                                        get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "claude-5h") },
+                                        set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "claude-5h", visible: $0) }
+                                    ))
+                                    .disabled(!isAntigravityConnected)
+                                    
+                                    Toggle("Weekly Limit", isOn: Binding(
+                                        get: { self.manager.isBucketTypeVisible(provider: "antigravity", type: "claude-weekly") },
+                                        set: { self.manager.setBucketTypeVisible(provider: "antigravity", type: "claude-weekly", visible: $0) }
+                                    ))
+                                    .disabled(!isAntigravityConnected)
+                                }
+                            }
+                        }
+                        .toggleStyle(.checkbox)
+                        .font(.system(size: 9.5))
+                        .foregroundColor(isAntigravityConnected ? .primary : .secondary.opacity(0.4))
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                    }
+                }
             }
         }
     }
     
-    private func providerRow(
+    private func providerCard<Content: View>(
         id: String,
         name: String,
         subtitle: String,
         icon: String,
         color: Color,
-        connectAction: @escaping () -> Void
+        connectAction: @escaping () -> Void,
+        @ViewBuilder extraContent: @escaping () -> Content
     ) -> some View {
         let isEnabled = manager.isProviderEnabled(id)
         let isConnected = manager.snapshots.first(where: { $0.provider == id })?.status == "ok"
         
-        return HStack(spacing: 12) {
-            // Icon
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(color.opacity(0.1))
-                    .frame(width: 36, height: 36)
-                
-                Image(systemName: icon)
-                    .font(.system(size: 18))
-                    .foregroundColor(color)
-            }
-            
-            // Text Details
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(name)
-                        .font(.system(size: 12, weight: .bold))
+        return VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                // Icon
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(color.opacity(0.1))
+                        .frame(width: 36, height: 36)
                     
-                    if isConnected && isEnabled {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.system(size: 10))
-                    }
+                    Image(systemName: icon)
+                        .font(.system(size: 18))
+                        .foregroundColor(color)
                 }
                 
-                Text(subtitle)
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            // Connect Button styled with TapGesture to resolve SwiftUI row-clamping & focus ring bugs (Feedback #2 & #5)
-            Text(isConnected ? "Connected" : "Connect")
-                .font(.system(size: 10, weight: .semibold))
-                .padding(.vertical, 4)
-                .padding(.horizontal, 10)
-                .background(isConnected ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
-                .foregroundColor(isConnected ? .green : .blue)
-                .cornerRadius(4)
-                .contentShape(Rectangle()) // Make the entire capsule area clickable
-                .onTapGesture {
-                    if !isAuthenticating {
-                        connectAction()
+                // Text Details
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(name)
+                            .font(.system(size: 12, weight: .bold))
+                        
+                        if isConnected && isEnabled {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.system(size: 10))
+                        }
                     }
+                    
+                    Text(subtitle)
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
                 }
+                
+                Spacer()
+                
+                // Connect Button styled with TapGesture to resolve SwiftUI row-clamping & focus ring bugs (Feedback #2 & #5)
+                Text(isConnected ? "Connected" : "Connect")
+                    .font(.system(size: 10, weight: .semibold))
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 10)
+                    .background(isConnected ? Color.green.opacity(0.1) : Color.blue.opacity(0.1))
+                    .foregroundColor(isConnected ? .green : .blue)
+                    .cornerRadius(4)
+                    .contentShape(Rectangle()) // Make the entire capsule area clickable
+                    .onTapGesture {
+                        if !isAuthenticating {
+                            connectAction()
+                        }
+                    }
+                
+                // Toggle Switch
+                Toggle("", isOn: Binding(
+                    get: { self.manager.isProviderEnabled(id) },
+                    set: { 
+                        self.manager.setProviderEnabled(id, enabled: $0)
+                        self.manager.refreshAll()
+                    }
+                ))
+                .toggleStyle(.switch)
+                .scaleEffect(0.7)
+                .frame(width: 40)
+                .buttonStyle(.borderless) // Borderless prevents conflict with tap gestures in the same HStack (Feedback #2)
+            }
+            .padding(10)
             
-            // Toggle Switch
-            Toggle("", isOn: Binding(
-                get: { self.manager.isProviderEnabled(id) },
-                set: { 
-                    self.manager.setProviderEnabled(id, enabled: $0)
-                    self.manager.refreshAll()
-                }
-            ))
-            .toggleStyle(.switch)
-            .scaleEffect(0.7)
-            .frame(width: 40)
-            .buttonStyle(.borderless) // Borderless prevents conflict with tap gestures in the same HStack (Feedback #2)
+            extraContent()
         }
-        .padding(10)
         .background(Color(NSColor.alternatingContentBackgroundColors[0]))
         .cornerRadius(8)
         .overlay(
@@ -398,6 +511,85 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(width: 400)
+    }
+    
+    // MARK: - Custom Google Credentials Input Sheet
+    
+    private var googleCredentialsConfigurationSheet: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Google OAuth Client Setup")
+                .font(.system(size: 14, weight: .bold))
+            
+            Text("To monitor your Antigravity quotas, please provide your own custom Google Cloud Platform OAuth credentials. You can create a 'Desktop Application' OAuth Client in the Google Cloud Console, enable the Cloud Code API, and paste the values below:")
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
+                .lineSpacing(1.5)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("OAuth Client ID")
+                        .font(.system(size: 10, weight: .bold))
+                    
+                    TextField("Enter Google Client ID", text: $googleClientIdInput)
+                        .font(.system(size: 10, design: .monospaced))
+                        .textFieldStyle(.roundedBorder)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("OAuth Client Secret")
+                        .font(.system(size: 10, weight: .bold))
+                    
+                    SecureField("Enter Google Client Secret", text: $googleClientSecretInput)
+                        .font(.system(size: 10, design: .monospaced))
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+            
+            if !authErrorMessage.isEmpty {
+                Text(authErrorMessage)
+                    .font(.caption2)
+                    .foregroundColor(.red)
+                    .lineLimit(2)
+            }
+            
+            HStack {
+                Spacer()
+                
+                Button("Cancel") {
+                    showGoogleCredentialsSheet = false
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Connect & Sign In") {
+                    manager.googleClientId = googleClientIdInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    manager.googleClientSecret = googleClientSecretInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    showGoogleCredentialsSheet = false
+                    
+                    isAuthenticating = true
+                    authErrorMessage = ""
+                    OAuthHelper.shared.startGoogleLoginFlow { result in
+                        DispatchQueue.main.async {
+                            self.isAuthenticating = false
+                            switch result {
+                            case .success:
+                                self.manager.setProviderEnabled("antigravity", enabled: true)
+                                self.manager.refreshAll()
+                            case .failure(let error):
+                                self.authErrorMessage = error.localizedDescription
+                                self.selectedProviderForToken = "antigravity"
+                                self.tokenInput = ""
+                                self.showTokenSheet = true
+                            }
+                        }
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(googleClientIdInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || googleClientSecretInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 420)
     }
 }
 
