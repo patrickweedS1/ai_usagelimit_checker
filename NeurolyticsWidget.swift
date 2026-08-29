@@ -168,7 +168,7 @@ struct NeurolyticsWidgetEntryView : View {
                 return true
             }
         } else if provider == "antigravity" {
-            let isClaudeOrGPT = bId.contains("claude") || bId.contains("gpt") || bId.contains("openai") || bId.contains("chatgpt")
+            let isClaudeOrGPT = bId.contains("claude") || bId.contains("gpt") || bId.contains("openai") || bId.contains("chatgpt") || bId.contains("3p")
             let is5h = bId.contains("five_hour") || bId.contains("session") || bId.contains("5h") || bId.contains("five-hour") || bId.contains("hour")
             let isWeekly = bId.contains("weekly")
             
