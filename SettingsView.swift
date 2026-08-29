@@ -129,74 +129,6 @@ struct SettingsView: View {
                         }
                     }
                 )
-                
-                // Antigravity Card
-                providerRow(
-                    id: "antigravity",
-                    name: "Antigravity CLI (Gemini)",
-                    subtitle: "Google Code Assist rolling daily/weekly quotas",
-                    icon: "sparkles",
-                    color: .purple,
-                    connectAction: {
-                        isAuthenticating = true
-                        authErrorMessage = ""
-                        OAuthHelper.shared.startGoogleLoginFlow { result in
-                            DispatchQueue.main.async {
-                                self.isAuthenticating = false
-                                switch result {
-                                case .success:
-                                    self.manager.setProviderEnabled("antigravity", enabled: true)
-                                    self.manager.refreshAll()
-                                case .failure(let error):
-                                    self.authErrorMessage = error.localizedDescription
-                                    self.selectedProviderForToken = "antigravity"
-                                    self.tokenInput = ""
-                                    self.showTokenSheet = true
-                                }
-                            }
-                        }
-                    }
-                )
-                
-                // ChatGPT Card
-                providerRow(
-                    id: "chatgpt",
-                    name: "ChatGPT (Codex)",
-                    subtitle: "OpenAI ChatGPT Plus/Pro session rate limits",
-                    icon: "text.bubble",
-                    color: .teal,
-                    connectAction: {
-                        // Open ChatGPT natively in the user's browser (Feedback #5)
-                        if let url = URL(string: "https://chatgpt.com") {
-                            NSWorkspace.shared.open(url)
-                        }
-                        selectedProviderForToken = "chatgpt"
-                        tokenInput = manager.getManualToken(for: "chatgpt") ?? ""
-                        authErrorMessage = "Opened ChatGPT in your default browser. Please log in, copy your session token, and paste it below."
-                        showTokenSheet = true
-                    }
-                )
-                
-                // Devin Card
-                providerRow(
-                    id: "devin",
-                    name: "Devin (Cognition)",
-                    subtitle: "Devin autonomous agent daily/monthly billing spent",
-                    icon: "square.grid.3x1.below.line.grid.1x2",
-                    color: .indigo,
-                    connectAction: {
-                        // Open app.devin.ai natively in the user's browser (Feedback #3 & #5)
-                        if let url = URL(string: "https://app.devin.ai") {
-                            NSWorkspace.shared.open(url)
-                        }
-                        selectedProviderForToken = "devin"
-                        tokenInput = manager.getManualToken(for: "devin") ?? ""
-                        devinOrgInput = UserDefaults.standard.string(forKey: "DevinOrgId") ?? ""
-                        devinHostInput = manager.devinCustomHost
-                        authErrorMessage = "Opened Devin in your browser. Please create or copy your service user API key (starts with cog_) and paste it below."
-                        showTokenSheet = true
-                    }
-                )
             }
         }
     }
@@ -439,22 +371,6 @@ struct SettingsView: View {
                     .cornerRadius(4)
             }
             
-            if selectedProviderForToken == "devin" {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Organization ID (Optional)")
-                        .font(.system(size: 10, weight: .bold))
-                    TextField("your_org_id (starts with org-)", text: $devinOrgInput)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 10))
-                    
-                    Text("Custom Host / Domain (Optional)")
-                        .font(.system(size: 10, weight: .bold))
-                    TextField("api.devin.ai or sentinelone.devinenterprise.com", text: $devinHostInput)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 10))
-                }
-            }
-            
             if !authErrorMessage.isEmpty {
                 Text(authErrorMessage)
                     .font(.caption2)
@@ -472,10 +388,6 @@ struct SettingsView: View {
                 
                 Button("Save and Connect") {
                     manager.setManualToken(for: selectedProviderForToken, token: tokenInput)
-                    if selectedProviderForToken == "devin" {
-                        UserDefaults.standard.set(devinOrgInput, forKey: "DevinOrgId")
-                        manager.devinCustomHost = devinHostInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "api.devin.ai" : devinHostInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    }
                     manager.setProviderEnabled(selectedProviderForToken, enabled: true)
                     manager.refreshAll()
                     showTokenSheet = false
