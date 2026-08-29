@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import WidgetKit
 
 public class QuotaManager: ObservableObject {
     public static let shared = QuotaManager()
@@ -25,6 +26,16 @@ public class QuotaManager: ObservableObject {
         
         // Ensure directory exists
         try? FileManager.default.createDirectory(at: configFolder, withIntermediateDirectories: true, attributes: nil)
+        
+        // Proactively mirror cache to widget sandbox container on initialization
+        let widgetConfigFolder = URL(fileURLWithPath: homeDir)
+            .appendingPathComponent("Library/Containers/com.patrickweed.neurolytics.widget/Data/.config/neurolytics")
+        try? FileManager.default.createDirectory(at: widgetConfigFolder, withIntermediateDirectories: true, attributes: nil)
+        
+        let widgetCacheURL = widgetConfigFolder.appendingPathComponent("cache.json")
+        if FileManager.default.fileExists(atPath: cacheURL.path) && !FileManager.default.fileExists(atPath: widgetCacheURL.path) {
+            try? FileManager.default.copyItem(at: cacheURL, to: widgetCacheURL)
+        }
         
         // Load cached snapshots on startup
         loadCachedSnapshots()
@@ -48,9 +59,22 @@ public class QuotaManager: ObservableObject {
     public func saveSnapshotsToCache(_ snapshots: [ProviderSnapshot]) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
-        if let data = try? encoder.encode(snapshots) {
-            try? data.write(to: cacheURL)
-        }
+        guard let data = try? encoder.encode(snapshots) else { return }
+        
+        // 1. Save to main app cache
+        try? data.write(to: cacheURL)
+        
+        // 2. Mirror to widget's sandboxed container so the widget can access it
+        let homeDir = NSHomeDirectory()
+        let widgetConfigFolder = URL(fileURLWithPath: homeDir)
+            .appendingPathComponent("Library/Containers/com.patrickweed.neurolytics.widget/Data/.config/neurolytics")
+        
+        try? FileManager.default.createDirectory(at: widgetConfigFolder, withIntermediateDirectories: true, attributes: nil)
+        let widgetCacheURL = widgetConfigFolder.appendingPathComponent("cache.json")
+        try? data.write(to: widgetCacheURL)
+        
+        // 3. Trigger a reload of all Widget timelines
+        WidgetCenter.shared.reloadAllTimelines()
     }
     
     // MARK: - Preferences & Settings Accessors

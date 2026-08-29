@@ -16,9 +16,16 @@ fi
 
 echo ""
 echo "Step 2: Applying ad-hoc code signature..."
-# Modern macOS requires all executables to have at least an ad-hoc signature to launch,
-# even if they are not quarantined.
-codesign --force --deep --sign - "${APP_PATH}"
+# Modern macOS requires all executables and app extensions to have at least an ad-hoc signature to launch/register.
+# App Extensions (like WidgetKit) MUST be sandboxed on modern macOS (Sonoma/Sequoia), so we sign them with the sandbox entitlement.
+# We sign from the inside out (first the widget extension, then the main app bundle).
+
+WIDGET_PATH="${APP_PATH}/Contents/PlugIns/NeurolyticsWidget.appex"
+echo "Signing Widget Extension with Sandbox Entitlements..."
+codesign --force --sign - --entitlements NeurolyticsWidget.entitlements "${WIDGET_PATH}"
+
+echo "Signing Main App Bundle..."
+codesign --force --sign - "${APP_PATH}"
 
 echo ""
 echo "Step 3: Creating a distribution zip using ditto..."

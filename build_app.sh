@@ -53,18 +53,30 @@ cat << 'EOF' > "${APP_DIR}/Contents/PlugIns/NeurolyticsWidget.appex/Contents/Inf
     <string>com.patrickweed.neurolytics.widget</string>
     <key>CFBundleName</key>
     <string>NeurolyticsWidget</string>
+    <key>CFBundleDisplayName</key>
+    <string>Neurolytics Quotas</string>
     <key>CFBundlePackageType</key>
     <string>XPC!</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>MacOSX</string>
+    </array>
+    <key>DTPlatformName</key>
+    <string>macosx</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
     <key>NSExtension</key>
     <dict>
         <key>NSExtensionPointIdentifier</key>
         <string>com.apple.widgetkit-extension</string>
-        <key>NSExtensionPrincipalClass</key>
-        <string>_TtC18NeurolyticsWidget18NeurolyticsWidget</string>
     </dict>
 </dict>
 </plist>
@@ -98,6 +110,7 @@ swiftc -parse-as-library \
     -O \
     -sdk "$(xcrun --show-sdk-path --sdk macosx)" \
     -target arm64-apple-macos14.0 \
+    -module-name NeurolyticsWidget \
     -o "${APP_DIR}/Contents/PlugIns/NeurolyticsWidget.appex/Contents/MacOS/NeurolyticsWidget" \
     NeurolyticsWidget.swift \
     QuotaModels.swift
