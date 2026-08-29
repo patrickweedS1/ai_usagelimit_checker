@@ -711,14 +711,47 @@ public class DevinClient {
         let fetchedAt = Date()
         var resolvedToken = manualToken
         var resolvedOrgId = manualOrgId
+        var resolvedHost = customHost
         
         // Auto-detect local credentials if manual token is nil
         if resolvedToken == nil {
             resolvedToken = ProcessInfo.processInfo.environment["DEVIN_API_KEY"]
         }
         
-        // Fallback to reading config
-        if resolvedToken == nil || resolvedOrgId == nil {
+        // Auto-detect from credentials.toml (Feedback #3: Auto-detect local Windsurf login state)
+        if resolvedToken == nil {
+            let homeDir = NSHomeDirectory()
+            let credentialsPath = URL(fileURLWithPath: homeDir).appendingPathComponent(".local/share/devin/credentials.toml")
+            if let contents = try? String(contentsOf: credentialsPath, encoding: .utf8) {
+                let lines = contents.components(separatedBy: "\n")
+                for line in lines {
+                    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmed.hasPrefix("windsurf_api_key") {
+                        let parts = trimmed.components(separatedBy: "=")
+                        if parts.count > 1 {
+                            var val = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                            if val.hasPrefix("\"") && val.hasSuffix("\"") {
+                                val = String(val.dropFirst().dropLast())
+                            }
+                            resolvedToken = val
+                        }
+                    }
+                    if trimmed.hasPrefix("devin_webapp_host") && resolvedHost == nil {
+                        let parts = trimmed.components(separatedBy: "=")
+                        if parts.count > 1 {
+                            var val = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                            if val.hasPrefix("\"") && val.hasSuffix("\"") {
+                                val = String(val.dropFirst().dropLast())
+                            }
+                            resolvedHost = val
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback to reading config for org_id
+        if resolvedOrgId == nil {
             let homeDir = NSHomeDirectory()
             let configPath = URL(fileURLWithPath: homeDir).appendingPathComponent(".config/devin/config.json")
             if let data = try? Data(contentsOf: configPath),
@@ -743,7 +776,7 @@ public class DevinClient {
         }
         
         // Resolve custom base host (e.g. sentinelone.devinenterprise.com -> api.sentinelone.devinenterprise.com) (Feedback #3)
-        var baseHost = customHost ?? "api.devin.ai"
+        var baseHost = resolvedHost ?? "api.devin.ai"
         if baseHost != "api.devin.ai" && !baseHost.hasPrefix("api.") {
             baseHost = "api." + baseHost
         }
@@ -834,19 +867,26 @@ public class DevinClient {
                     let fallbackUrl = URL(string: "https://\(baseHost)/v3/self")!
                     NetworkHelper.performRequest(url: fallbackUrl, headers: headers) { fallbackResult in
                         switch fallbackResult {
-                        case .success:
+                        case .success(let fallbackData):
+                            var finalAccountName = "Devin Account"
+                            if let fJson = try? JSONSerialization.jsonObject(with: fallbackData) as? [String: Any] {
+                                let userName = fJson["user_name"] as? String
+                                let orgId = fJson["org_id"] as? String
+                                finalAccountName = userName ?? orgId ?? "Devin Account"
+                            }
+                            
                             completion(ProviderSnapshot(
                                 provider: "devin",
                                 themeColorName: "indigo",
-                                accountName: "Devin Account (Active)",
+                                accountName: finalAccountName,
                                 status: "ok",
                                 statusDetails: nil,
                                 groups: [ModelGroup(
                                     displayName: "DEVIN COGNITION METRICS",
-                                    description: "Credentials Verified. Custom Billing Limits require Enterprise Service User Key.",
+                                    description: "Credentials Verified & Connected Natively",
                                     buckets: [QuotaBucket(
                                         bucketId: "devin-status",
-                                        displayName: "API Key Integration",
+                                        displayName: "Windsurf Session Integration",
                                         windowType: "other",
                                         usedPercent: 0,
                                         remainingPercent: 100.0,
