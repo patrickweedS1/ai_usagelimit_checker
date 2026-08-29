@@ -80,35 +80,21 @@ public class QuotaManager: ObservableObject {
         }
     }
     
-    public var devinCustomHost: String {
-        get { UserDefaults.standard.string(forKey: "DevinCustomHost") ?? "api.devin.ai" }
-        set {
-            UserDefaults.standard.set(newValue, forKey: "DevinCustomHost")
-            objectWillChange.send()
-        }
-    }
-    
     public func isProviderEnabled(_ provider: String) -> Bool {
-        let enabled = UserDefaults.standard.array(forKey: "EnabledProviders") as? [String] ?? ["claude", "antigravity", "chatgpt"]
-        return enabled.contains(provider)
+        return provider == "claude"
     }
     
     public func setProviderEnabled(_ provider: String, enabled: Bool) {
-        var list = UserDefaults.standard.array(forKey: "EnabledProviders") as? [String] ?? ["claude", "antigravity", "chatgpt"]
-        if enabled && !list.contains(provider) {
-            list.append(provider)
-        } else if !enabled && list.contains(provider) {
-            list.removeAll { $0 == provider }
-        }
-        UserDefaults.standard.set(list, forKey: "EnabledProviders")
-        objectWillChange.send()
+        // Only Claude is supported now
     }
     
     public func getManualToken(for provider: String) -> String? {
+        guard provider == "claude" else { return nil }
         return KeychainHelper.shared.readPassword(service: "Neurolytics-\(provider)", account: "token")
     }
     
     public func setManualToken(for provider: String, token: String) {
+        guard provider == "claude" else { return }
         if token.isEmpty {
             KeychainHelper.shared.deletePassword(service: "Neurolytics-\(provider)", account: "token")
         } else {
@@ -126,79 +112,22 @@ public class QuotaManager: ObservableObject {
             self.isRefreshing = true
         }
         
-        let dispatchGroup = DispatchGroup()
-        var newSnapshots: [ProviderSnapshot] = []
-        let snapshotQueue = DispatchQueue(label: "com.neurolytics.snapshots.sync")
-        
-        // 1. Claude Code
-        if isProviderEnabled("claude") {
-            dispatchGroup.enter()
-            let token = getManualToken(for: "claude")
-            ClaudeClient.fetchUsage(manualToken: token) { snapshot in
-                snapshotQueue.async {
-                    newSnapshots.append(snapshot)
-                    dispatchGroup.leave()
-                }
+        let token = getManualToken(for: "claude")
+        ClaudeClient.fetchUsage(manualToken: token) { snapshot in
+            DispatchQueue.main.async {
+                let newSnapshots = [snapshot]
+                self.snapshots = newSnapshots
+                self.isRefreshing = false
+                self.lastRefreshed = Date()
+                
+                // Save to JSON cache
+                self.saveSnapshotsToCache(newSnapshots)
+                
+                // Notify widget to refresh if possible
+                NotificationCenter.default.post(name: Notification.Name("QuotaRefreshed"), object: nil)
+                
+                completion?(newSnapshots)
             }
-        }
-        
-        // 2. Antigravity
-        if isProviderEnabled("antigravity") {
-            dispatchGroup.enter()
-            let token = getManualToken(for: "antigravity")
-            AntigravityClient.fetchUsage(manualToken: token) { snapshot in
-                snapshotQueue.async {
-                    newSnapshots.append(snapshot)
-                    dispatchGroup.leave()
-                }
-            }
-        }
-        
-        // 3. ChatGPT
-        if isProviderEnabled("chatgpt") {
-            dispatchGroup.enter()
-            let token = getManualToken(for: "chatgpt")
-            ChatGPTClient.fetchUsage(manualToken: token) { snapshot in
-                snapshotQueue.async {
-                    newSnapshots.append(snapshot)
-                    dispatchGroup.leave()
-                }
-            }
-        }
-        
-        // 4. Devin
-        if isProviderEnabled("devin") {
-            dispatchGroup.enter()
-            let token = getManualToken(for: "devin")
-            let orgId = UserDefaults.standard.string(forKey: "DevinOrgId")
-            DevinClient.fetchUsage(manualToken: token, manualOrgId: orgId, customHost: devinCustomHost) { snapshot in
-                snapshotQueue.async {
-                    newSnapshots.append(snapshot)
-                    dispatchGroup.leave()
-                }
-            }
-        }
-        
-        dispatchGroup.notify(queue: .main) {
-            // Sort by predefined order
-            let order = ["claude", "antigravity", "chatgpt", "devin"]
-            newSnapshots.sort { (a, b) -> Bool in
-                let idxA = order.firstIndex(of: a.provider) ?? 99
-                let idxB = order.firstIndex(of: b.provider) ?? 99
-                return idxA < idxB
-            }
-            
-            self.snapshots = newSnapshots
-            self.isRefreshing = false
-            self.lastRefreshed = Date()
-            
-            // Save to JSON cache
-            self.saveSnapshotsToCache(newSnapshots)
-            
-            // Notify widget to refresh if possible
-            NotificationCenter.default.post(name: Notification.Name("QuotaRefreshed"), object: nil)
-            
-            completion?(newSnapshots)
         }
     }
 }
