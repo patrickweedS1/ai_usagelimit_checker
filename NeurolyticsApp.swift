@@ -93,6 +93,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if popover.isShown {
                 popover.performClose(sender)
             } else {
+                // Trigger an actual usage refresh when the menu bar item is opened
+                QuotaManager.shared.refreshAll()
+                
                 popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
                 // Force popover window to be key so it captures keyboard events immediately
                 popover.contentViewController?.view.window?.makeKey()
@@ -145,8 +148,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupBackgroundTimer() {
         backgroundTimer?.invalidate()
         
-        // Polls every 15 minutes (900 seconds)
-        backgroundTimer = Timer.scheduledTimer(withTimeInterval: 900.0, repeats: true) { _ in
+        // Polls every 2 minutes (120 seconds)
+        backgroundTimer = Timer.scheduledTimer(withTimeInterval: 120.0, repeats: true) { _ in
             QuotaManager.shared.refreshAll()
         }
     }

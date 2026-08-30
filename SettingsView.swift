@@ -104,10 +104,22 @@ struct SettingsView: View {
     
     private var providersTab: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("AI Providers & Quota Connections")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(.gray)
-                .padding(.bottom, 4)
+            HStack {
+                Text("AI Providers & Quota Connections")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.gray)
+                
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 9))
+                    Text("Refreshes every 2m")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundColor(.secondary)
+            }
+            .padding(.bottom, 4)
             
             VStack(spacing: 12) {
                 // Claude Card
