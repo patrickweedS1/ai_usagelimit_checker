@@ -25,8 +25,8 @@ struct Provider: TimelineProvider {
         let snapshots = getLatestSnapshots()
         let entry = SimpleEntry(date: Date(), snapshots: snapshots)
         
-        // Re-evaluate every 5 minutes
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date()) ?? Date()
+        // Re-evaluate every 2 minutes
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 2, to: Date()) ?? Date()
         let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
     }
