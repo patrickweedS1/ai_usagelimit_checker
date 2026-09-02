@@ -49,7 +49,7 @@ struct Provider: TimelineProvider {
             ProviderSnapshot(
                 provider: "claude",
                 themeColorName: "orange",
-                accountName: "elisha.productions@gmail.com",
+                accountName: "patrick.weed@sentinelone.com",
                 status: "ok",
                 statusDetails: nil,
                 groups: [
