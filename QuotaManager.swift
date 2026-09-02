@@ -233,11 +233,39 @@ public class QuotaManager: ObservableObject {
     
     public func getManualToken(for provider: String) -> String? {
         guard provider == "claude" || provider == "antigravity" else { return nil }
-        return KeychainHelper.shared.readPassword(service: "Neurolytics-\(provider)", account: "token")
+        guard let token = KeychainHelper.shared.readPassword(service: "Neurolytics-\(provider)", account: "token") else { return nil }
+        
+        if provider == "antigravity" {
+            // Ensure retrieved token is a valid dynamic OAuth JSON, not a static plain-text token!
+            if let data = token.data(using: .utf8),
+               let _ = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                return token
+            } else {
+                // It's a static plain-text token. We delete it and return nil!
+                KeychainHelper.shared.deletePassword(service: "Neurolytics-antigravity", account: "token")
+                return nil
+            }
+        }
+        
+        return token
     }
     
     public func setManualToken(for provider: String, token: String) {
         guard provider == "claude" || provider == "antigravity" else { return }
+        
+        if provider == "antigravity" && !token.isEmpty {
+            // Force never using a static API token for Antigravity!
+            // Check if the token is a valid JSON string (our dynamic OAuth format). If not, we forbid it.
+            if let data = token.data(using: .utf8),
+               let _ = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                // It is a valid JSON containing access_token and refresh_token, so it's a dynamic OAuth token!
+            } else {
+                // It's a static plain-text token. We reject it!
+                print("Error: Static plain-text API tokens are strictly forbidden for Antigravity.")
+                return
+            }
+        }
+        
         if token.isEmpty {
             KeychainHelper.shared.deletePassword(service: "Neurolytics-\(provider)", account: "token")
         } else {

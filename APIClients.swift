@@ -459,7 +459,7 @@ public class AntigravityClient {
         var resolvedRefreshToken: String? = nil
         var isFromKeychain = false
         
-        // 1. Try to read from manual token stored in Keychain (which is now a structured JSON string)
+        // 1. Try to read from manual token stored in Keychain (must be a structured JSON string, static plain-text tokens are forbidden)
         if let tokenString = manualToken ?? QuotaManager.shared.getManualToken(for: "antigravity") {
             if let data = tokenString.data(using: .utf8),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -467,7 +467,8 @@ public class AntigravityClient {
                 resolvedRefreshToken = json["refresh_token"] as? String ?? json["refreshToken"] as? String
                 isFromKeychain = true
             } else {
-                resolvedToken = tokenString
+                // Reject static plain-text token
+                resolvedToken = nil
             }
         }
         
@@ -482,7 +483,7 @@ public class AntigravityClient {
             }
         }
         
-        // 3. Fallback to official Antigravity CLI Keychain entries
+        // 3. Fallback to official Antigravity CLI Keychain entries (must be valid JSON structures representing dynamic OAuth)
         if resolvedToken == nil {
             if let keychainCreds = KeychainHelper.shared.readPassword(service: "gemini", account: "antigravity") {
                 if let data = keychainCreds.data(using: .utf8),
@@ -490,7 +491,8 @@ public class AntigravityClient {
                     resolvedToken = json["access_token"] as? String ?? json["accessToken"] as? String
                     resolvedRefreshToken = json["refresh_token"] as? String ?? json["refreshToken"] as? String
                 } else {
-                    resolvedToken = keychainCreds
+                    // Reject static plain-text token
+                    resolvedToken = nil
                 }
             }
         }
@@ -502,7 +504,8 @@ public class AntigravityClient {
                     resolvedToken = json["access_token"] as? String ?? json["accessToken"] as? String
                     resolvedRefreshToken = json["refresh_token"] as? String ?? json["refreshToken"] as? String
                 } else {
-                    resolvedToken = keychainCreds
+                    // Reject static plain-text token
+                    resolvedToken = nil
                 }
             }
         }

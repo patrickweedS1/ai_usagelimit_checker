@@ -122,7 +122,8 @@ In the `feature/antigravity` branch, we have restored robust support for side-by
    - Your local `.codexbar/antigravity/oauth_creds.json` configuration file.
    - Your macOS Keychain (service `"gemini"`, account `"antigravity"` or service `"Antigravity Safe Storage"`).
 2. **On-Demand:** If local credentials are not found, clicking **Connect** in Settings starts our local loopback server on port `51121` (whitelisted for Google OAuth redirects) and initiates a Google PKCE authorization flow using public plugin credentials.
-3. **Automatic Token Refreshing:** Google OAuth access tokens are valid for 1 hour. The application automatically refreshes your token in the background using the secure refresh token, ensuring continuous and seamless updates.
+3. **No Static/Plain-Text Keys Allowed:** For maximum security, static plain-text API keys or tokens are strictly forbidden and rejected for Google Antigravity. Authentication is enforced to only use dynamic OAuth and secure token rotation.
+4. **Automatic Token Refreshing:** Google OAuth access tokens are valid for 1 hour. The application automatically refreshes your token in the background using the secure refresh token, ensuring continuous and seamless updates.
 
 
 

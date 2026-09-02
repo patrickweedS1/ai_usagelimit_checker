@@ -589,9 +589,7 @@ struct SettingsView: View {
                                 self.manager.refreshAll()
                             case .failure(let error):
                                 self.authErrorMessage = error.localizedDescription
-                                self.selectedProviderForToken = "antigravity"
-                                self.tokenInput = ""
-                                self.showTokenSheet = true
+                                self.showGoogleCredentialsSheet = true
                             }
                         }
                     }
