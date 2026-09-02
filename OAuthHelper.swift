@@ -172,9 +172,11 @@ public class OAuthHelper {
         
         callbackServer?.start()
         
+        let googleClientId = QuotaManager.shared.googleClientId
+        
         var authComponents = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
         authComponents.queryItems = [
-            URLQueryItem(name: "client_id", value: "(QuotaManager.shared.googleClientId)"),
+            URLQueryItem(name: "client_id", value: googleClientId),
             URLQueryItem(name: "redirect_uri", value: "http://localhost:\(googlePort)/oauth-callback"),
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "scope", value: "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/cclog https://www.googleapis.com/auth/experimentsandconfigs"),
@@ -196,10 +198,13 @@ public class OAuthHelper {
         guard let tokenUrl = URL(string: "https://oauth2.googleapis.com/token") else { return }
         let googlePort: UInt16 = 51121
         
+        let googleClientId = QuotaManager.shared.googleClientId
+        let googleClientSecret = QuotaManager.shared.googleClientSecret
+        
         let bodyComponents = [
             "grant_type=authorization_code",
-            "client_id=(QuotaManager.shared.googleClientId)",
-            "client_secret=(QuotaManager.shared.googleClientSecret)",
+            "client_id=\(googleClientId)",
+            "client_secret=\(googleClientSecret)",
             "code=\(code)",
             "code_verifier=\(verifier)",
             "redirect_uri=http://localhost:\(googlePort)/oauth-callback"

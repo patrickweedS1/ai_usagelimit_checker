@@ -723,10 +723,13 @@ public class AntigravityClient {
             return
         }
         
+        let googleClientId = QuotaManager.shared.googleClientId
+        let googleClientSecret = QuotaManager.shared.googleClientSecret
+        
         let bodyComponents = [
             "grant_type=refresh_token",
-            "client_id=(QuotaManager.shared.googleClientId)",
-            "client_secret=(QuotaManager.shared.googleClientSecret)",
+            "client_id=\(googleClientId)",
+            "client_secret=\(googleClientSecret)",
             "refresh_token=\(refreshToken)"
         ]
         
